@@ -11,8 +11,8 @@
  */
 
 import { useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Activity, Film, Ruler, Settings, Home, X } from 'lucide-react';
+import { NavLink, Link } from 'react-router-dom';
+import { Activity, Film, Ruler, Settings, Home, X, BarChart } from 'lucide-react';
 import { getApiBase } from '../lib/cvApi';
 import './Navbar.css';
 
@@ -280,6 +280,25 @@ export function Navbar() {
                 ✓ FormAI setup reset.
               </span>
             )}
+          </section>
+
+          {/* Section 4 — Developer Tools */}
+          <section className="settings-modal__section" aria-labelledby="settings-dev-heading">
+            <h3 className="settings-modal__section-title" id="settings-dev-heading">
+              Developer Tools
+            </h3>
+            <p className="settings-modal__help">
+              View analytics and telemetry data for historical runs across all inference methods.
+            </p>
+            <Link
+              to="/debug/dashboard"
+              className="btn btn--ghost btn--sm"
+              onClick={closeSettings}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+            >
+              <BarChart size={16} aria-hidden="true" />
+              Open Telemetry Dashboard
+            </Link>
           </section>
         </div>
       </dialog>

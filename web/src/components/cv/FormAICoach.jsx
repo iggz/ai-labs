@@ -12,15 +12,17 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Upload, AlertTriangle, Info, RotateCcw,
-  Video, Download, Zap,
+  Video, Download, Zap, BarChart
 } from 'lucide-react';
 import { submitAnalysis } from '../../lib/cvApi';
 import { FormAIAudioEngine } from './FormAIAudioEngine';
 import { FormStatsDashboard } from './FormStatsDashboard';
 import { InfoPopover } from './InfoPopover';
 import { FeatureDisclosure } from './FeatureDisclosure';
+import { UnifiedDebugLogger, DEBUG_ENABLED } from '../../lib/inference/unifiedDebugLogger';
 
 // ── Local storage helpers ─────────────────────────────────────────────────────
 function loadPref(key, defaultVal) {
@@ -65,7 +67,7 @@ function ConfigureAndUploadStep({
   cameraAngle, setCameraAngle,
   overlayMode, setOverlayMode,
   protocol, setProtocol,
-  onSubmit, isLoading,
+  onSubmit, onTestAll, isLoading,
   error,
 }) {
   const [file, setFile] = useState(null);
@@ -263,7 +265,10 @@ function ConfigureAndUploadStep({
           <>
             <Upload size={28} className="drop-zone__icon" />
             <p className="drop-zone__label">Drop your video here or tap to browse</p>
-            <p className="drop-zone__hint">MP4, MOV, up to 100 MB</p>
+            <p className="drop-zone__hint">
+              MP4, MOV, up to 100 MB
+              {isOnDevice && ' · 30s max for on-device'}
+            </p>
           </>
         )}
       </div>
@@ -278,6 +283,47 @@ function ConfigureAndUploadStep({
         {isLoading ? 'Uploading…' : 'Analyze My Form →'}
       </button>
 
+      {/* ── Test All button (always shown) ── */}
+      {onTestAll && (
+        <>
+          <button
+            id="formai-test-all-btn"
+            className="btn btn--full formai-configure__cta"
+            style={{
+              marginTop: '8px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              color: '#1c1917',
+              fontWeight: 700,
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              boxShadow: '0 0 15px rgba(245, 158, 11, 0.2)',
+            }}
+            onClick={() => file && onTestAll(file, exercise)}
+            disabled={!file || isLoading}
+          >
+            ⚡ Test All Methods (Debug)
+          </button>
+          
+          <Link
+            to="/debug/dashboard"
+            className="btn btn--full"
+            style={{
+              marginTop: '8px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: '#94a3b8',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              textDecoration: 'none'
+            }}
+          >
+            <BarChart size={16} aria-hidden="true" />
+            View Telemetry Dashboard
+          </Link>
+        </>
+      )}
+
       <p className="formai-disclaimer-footer">
         <Info size={12} /> AI-generated estimate for educational purposes only. Always consult your trainer.
       </p>
@@ -288,11 +334,13 @@ function ConfigureAndUploadStep({
 // ── Step: Processing (dead-centered) ─────────────────────────────────────────
 function ProcessingStep({ progress, protocol }) {
   const isOnDevice = protocol === 'on-device';
+  const isTestAll = progress?.total > 1;
 
   const inferFrames = progress?.totalFrames || 0;
   const framesProcessed = progress?.framesProcessed || 0;
 
-  // Estimate time remaining based on FRAME_STRIDE=2, 15fps output
+  // Estimate time remaining — only for the inference (processing) phase,
+  // since capture phase runs at 1× video speed and is very fast.
   let timeRemaining = null;
   if (progress?.phase === 'processing' && progress.startTime && framesProcessed > 2) {
     const elapsed = (Date.now() - progress.startTime) / 1000;
@@ -307,8 +355,29 @@ function ProcessingStep({ progress, protocol }) {
 
   // Compute progress bar percentage
   let pct;
-  if (progress?.phase === 'processing' && inferFrames) {
-    pct = Math.round((framesProcessed / inferFrames) * 80) + 10;
+  if (isTestAll) {
+    // Test All: divide bar into 3 segments (0-33, 33-66, 66-100)
+    const methodIndex = progress?.index ?? 0;
+    const segmentSize = 100 / (progress?.total ?? 3);
+    if (progress?.phase === 'method_complete' || progress?.phase === 'method_failed') {
+      pct = Math.round((methodIndex + 1) * segmentSize);
+    } else if (progress?.phase === 'complete') {
+      pct = 100;
+    } else {
+      pct = Math.round(methodIndex * segmentSize + segmentSize * 0.5);
+    }
+  } else if (progress?.phase === 'capturing' && inferFrames) {
+    // Capturing phase: 10–30% of the bar
+    pct = Math.round((framesProcessed / inferFrames) * 20) + 10;
+  } else if (progress?.phase === 'compiling') {
+    // Shader compilation: hold at 30%
+    pct = 30;
+  } else if (progress?.phase === 'fallback') {
+    // WASM fallback: pulse at 32%
+    pct = 32;
+  } else if (progress?.phase === 'processing' && inferFrames) {
+    // Inference phase: 30–90% of the bar
+    pct = Math.round((framesProcessed / inferFrames) * 60) + 30;
   } else if (progress?.phase === 'loading_model') {
     pct = 8;
   } else if (progress?.phase === 'queued') {
@@ -317,16 +386,45 @@ function ProcessingStep({ progress, protocol }) {
     pct = isOnDevice ? 8 : 15;
   }
 
-  const label = progress?.phase === 'loading_model'
+  const label = isTestAll
+    ? (progress?.message ?? `Testing method ${(progress?.index ?? 0) + 1} of ${progress?.total ?? 3}…`)
+    : progress?.phase === 'loading_model'
     ? 'Loading AI model…'
+    : progress?.phase === 'capturing'
+    ? 'Capturing frames…'
+    : progress?.phase === 'compiling'
+    ? 'Compiling GPU shaders…'
+    : progress?.phase === 'fallback'
+    ? 'Switching to WASM…'
     : progress?.phase === 'processing'
-    ? 'Analyzing…'
+    ? 'Running inference…'
     : 'In Queue…';
 
   return (
     <div className="formai-processing-centered" role="status" aria-live="polite">
       <div className="formai-processing__spinner" aria-label="Processing" />
       <h2 className="formai-processing__label">{label}</h2>
+
+      {/* Test All method progress indicator */}
+      {isTestAll && progress?.methodLabel && (
+        <p style={{
+          fontSize: '13px', color: '#94a3b8', margin: '4px 0 8px',
+          display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center',
+        }}>
+          <span style={{
+            display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+            fontWeight: 700, letterSpacing: '0.5px',
+            background: progress.phase === 'method_failed'
+              ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)',
+            color: progress.phase === 'method_failed'
+              ? '#fca5a5' : '#fbbf24',
+          }}>
+            {(progress.index ?? 0) + 1}/{progress.total}
+          </span>
+          {progress.methodLabel}
+        </p>
+      )}
+
       {/* Queue position (server path) */}
       {progress?.position > 0 && (
         <p className="formai-processing__queue">
@@ -334,11 +432,38 @@ function ProcessingStep({ progress, protocol }) {
           {progress.estimatedWait && ` · ~${progress.estimatedWait}s wait`}
         </p>
       )}
-      {/* Frame-by-frame progress (on-device path) */}
+      {/* Model loading */}
       {progress?.phase === 'loading_model' && (
         <p className="formai-processing__frames">Loading AI model into browser…</p>
       )}
-      {progress?.phase === 'processing' && inferFrames && (
+      {/* WebGPU shader compilation (first frame only) */}
+      {progress?.phase === 'compiling' && (
+        <p className="formai-processing__frames">
+          First-time GPU setup — this can take up to 15s.
+          <br />
+          <span style={{ opacity: 0.6, fontSize: '0.85em' }}>
+            Will fall back to WASM if GPU is unavailable.
+          </span>
+        </p>
+      )}
+      {/* WASM fallback */}
+      {progress?.phase === 'fallback' && (
+        <p className="formai-processing__frames">
+          GPU shaders timed out — loading WASM engine…
+          <br />
+          <span style={{ opacity: 0.6, fontSize: '0.85em' }}>
+            This is slower but works on all devices.
+          </span>
+        </p>
+      )}
+      {/* Frame capture phase (play-through) */}
+      {progress?.phase === 'capturing' && inferFrames > 0 && (
+        <p className="formai-processing__frames">
+          Captured {framesProcessed} / ~{inferFrames} frames
+        </p>
+      )}
+      {/* Inference phase */}
+      {progress?.phase === 'processing' && inferFrames > 0 && (
         <p className="formai-processing__frames">
           Frame {framesProcessed} / {inferFrames}
           {timeRemaining && (
@@ -366,7 +491,9 @@ function ProcessingStep({ progress, protocol }) {
         <div className="formai-progress-bar__fill" style={{ width: `${pct}%` }} />
       </div>
       <p className="formai-processing__privacy-note">
-        {isOnDevice
+        {isTestAll
+          ? '🔬 Running all 3 methods for comparison — this may take a few minutes.'
+          : isOnDevice
           ? '🔒 Processing entirely on your device — video never leaves your browser.'
           : '🔒 Your video is processed securely and never stored.'}
       </p>
@@ -376,7 +503,8 @@ function ProcessingStep({ progress, protocol }) {
 
 // ── Step: Results (two-tab layout) ───────────────────────────────────────────
 function ResultsStep({ result, onReset, getAudioEngine }) {
-  const { signed_url, metadata, processing_log } = result;
+  const { signed_url, metadata, processing_log, _debugLogger } = result;
+  const _unifiedDebugLogger = result._unifiedDebugLogger ?? _debugLogger;
   const {
     rep_count, exercise_type, stats,
     camera_angle_warnings,
@@ -565,7 +693,48 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
             {!signed_url && (
               <span className="formai-badge-note"> · Video export not available in this browser</span>
             )}
+            {signed_url && processing_log?.output_format === 'source_video' && (
+              <span className="formai-badge-note"> · Showing original video (skeleton overlay not yet supported on iOS)</span>
+            )}
           </div>
+        )}
+
+        {/* Temporary diagnostic panel — visible on mobile where console isn't accessible */}
+        {processing_log?.diagnostics && (
+          <details className="formai-debug-panel" style={{
+            margin: '8px 0', padding: '8px 12px', borderRadius: '8px',
+            background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+            fontSize: '11px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6',
+          }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
+              🔍 Debug Info ({processing_log.device}, {processing_log.output_format})
+            </summary>
+            <div style={{ marginTop: '6px', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+              {Object.entries(processing_log.diagnostics).map(([k, v]) => (
+                <div key={k}>{k}: <strong style={{ color: '#fff' }}>{String(v)}</strong></div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        {/* Download Debug Log button — visible for ALL methods when ?debug=1 */}
+        {_unifiedDebugLogger && (
+          <button
+            className="btn btn--outline btn--small"
+            style={{ margin: '8px 0', fontSize: '12px', opacity: 0.7 }}
+            onClick={() => {
+              const url = _unifiedDebugLogger.toDownloadUrl();
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `debug-log-${_unifiedDebugLogger.method}-${_unifiedDebugLogger.sessionId.slice(0, 8)}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+          >
+            💾 Download Debug Log ({_unifiedDebugLogger.method})
+          </button>
         )}
 
         <FormStatsDashboard
@@ -672,12 +841,27 @@ export function FormAICoach() {
     return () => audioEngineRef.current?.destroy();
   }, []);
 
+  const navigate = useNavigate();
+
   const handleSubmit = useCallback(async (file, exerciseType) => {
     setIsLoading(true);
     setError(null);
     setStep('processing');
 
     const consentToken = crypto.randomUUID();
+
+    // ── Unified debug telemetry (all methods) ──────────────────────────
+    const debugMethod = protocol === 'on-device' ? 'on-device'
+                      : protocol === 'yolo' ? 'yolo' : 'dnn';
+    const debugLogger = DEBUG_ENABLED
+      ? new UnifiedDebugLogger(debugMethod, exerciseType, cameraAngle)
+      : null;
+
+    if (debugLogger) {
+      debugLogger.markFileSelected();
+      await debugLogger.init(file);
+      debugLogger.markSubmitStart();
+    }
 
     try {
       let res;
@@ -688,8 +872,11 @@ export function FormAICoach() {
           exerciseType,
           overlayMode,
           cameraAngle,
+          preferredFormat: loadPref('formai_output_format', 'webm'),
           onProgress: (prog) => setProgress({ ...prog, startTime }),
         });
+        // Merge the existing on-device DebugLogger report into the unified schema
+        debugLogger?.mergeOnDeviceReport(res._debugLogger?.getReport());
       } else {
         res = await submitAnalysis(
           file,
@@ -702,11 +889,24 @@ export function FormAICoach() {
             camera_angle: cameraAngle,
           },
           (prog) => setProgress(prog),
+          debugLogger,  // passes to cvApi for network timing instrumentation
         );
       }
+
+      // Extract accuracy metrics and send the unified log
+      debugLogger?.setAccuracy(res.metadata);
+      debugLogger?.send();  // fire-and-forget
+
+      // Attach the unified logger to the result for the download button
+      if (debugLogger) {
+        res._unifiedDebugLogger = debugLogger;
+      }
+
       setResult(res);
       setStep('results');
     } catch (err) {
+      debugLogger?.error('ERR_UNKNOWN', err);
+      debugLogger?.send();
       setError(err.message);
       setStep('configure');
     } finally {
@@ -720,6 +920,31 @@ export function FormAICoach() {
     setProgress(null);
     setError(null);
   }, []);
+
+  // ── Test All handler (debug mode) ─────────────────────────────────────────
+  const handleTestAll = useCallback(async (file, exerciseType) => {
+    setIsLoading(true);
+    setError(null);
+    setStep('processing');
+
+    try {
+      const { runTestAll } = await import('../../lib/inference/testAllOrchestrator.js');
+      const { batchNumber } = await runTestAll(file, {
+        exerciseType,
+        cameraAngle,
+        overlayMode,
+        onProgress: (prog) => setProgress(prog),
+      });
+
+      // Navigate to comparison page on completion
+      navigate(`/debug/compare?batch=${batchNumber}`);
+    } catch (err) {
+      setError(`Test All failed: ${err.message}`);
+      setStep('configure');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cameraAngle, overlayMode, navigate]);
 
   return (
     <section className="formai-coach" aria-label="FormAI Coach">
@@ -735,6 +960,7 @@ export function FormAICoach() {
             protocol={protocol}
             setProtocol={setProtocol}
             onSubmit={handleSubmit}
+            onTestAll={handleTestAll}
             isLoading={isLoading}
             error={error}
           />
