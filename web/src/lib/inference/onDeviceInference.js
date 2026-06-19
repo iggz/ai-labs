@@ -169,7 +169,16 @@ export async function processVideoOnDevice(file, {
 
   // Try VideoEncoder first
   const encResult = await createVideoEncoder(
-    (chunk, meta) => muxer?.addVideoChunk(chunk, meta),
+    (chunk, meta) => {
+      if (!muxer) return;
+      // mp4-muxer crashes if decoderConfig.colorSpace is null (Safari omits it).
+      // Sanitize: strip null/undefined colorSpace before handing off to muxer.
+      if (meta?.decoderConfig?.colorSpace == null && meta?.decoderConfig) {
+        const { colorSpace: _omit, ...dc } = meta.decoderConfig;
+        meta = { ...meta, decoderConfig: dc };
+      }
+      muxer.addVideoChunk(chunk, meta);
+    },
     w, h
   );
 
