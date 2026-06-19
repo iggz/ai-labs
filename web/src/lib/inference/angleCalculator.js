@@ -45,10 +45,12 @@ export function getExerciseAngle(keypoints, confidences, exerciseType) {
 
   const { vertex, arm1, arm2 } = joints;
 
-  // All 3 keypoints must be visible
-  if (confidences[vertex] < 0.3 ||
-      confidences[arm1]   < 0.3 ||
-      confidences[arm2]   < 0.3) return null;
+  // If the joints are completely invisible, skip.
+  // We use a very low threshold (0.05) to match Python's behavior,
+  // which relies on the OneEuroFilter to carry the trajectory through occlusions.
+  if (confidences[vertex] < 0.05 ||
+      confidences[arm1]   < 0.05 ||
+      confidences[arm2]   < 0.05) return null;
 
   const a = [keypoints[arm1 * 2], keypoints[arm1 * 2 + 1]];
   const b = [keypoints[vertex * 2], keypoints[vertex * 2 + 1]];
