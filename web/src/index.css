@@ -1,0 +1,282 @@
+/* ══════════════════════════════════════════
+   index.css — AI Labs Design System Foundation
+   Extracted from HHB: reset, tokens, base layers
+   ══════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800;900&display=swap');
+
+@layer reset, tokens, base, components, utilities;
+
+/* ── Reset Layer ── */
+@layer reset {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, h1, h2, h3, h4, h5, h6, p, ul, ol, li, figure, figcaption, blockquote, dl, dd {
+    margin: 0;
+    padding: 0;
+  }
+
+  ul, ol {
+    list-style: none;
+  }
+
+  img, picture, svg, video, canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  input, button, textarea, select {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ── Design Tokens Layer ── */
+@layer tokens {
+  :root {
+    /* --- Tier 1: Literal Colors (oklch) --- */
+    --rose-50:  oklch(0.96 0.03 15);
+    --rose-100: oklch(0.91 0.05 15);
+    --rose-200: oklch(0.82 0.08 15);
+    --rose-400: oklch(0.72 0.13 15);   /* Primary accent */
+    --rose-600: oklch(0.58 0.12 15);
+    --rose-800: oklch(0.40 0.09 15);
+
+    /* Neutrals: Deep Smoky Warm Brown-Black */
+    --smoky-950: oklch(0.12 0.012 50);  /* Deepest warm background */
+    --smoky-900: oklch(0.16 0.015 50);  /* Base background */
+    --smoky-800: oklch(0.22 0.015 50);  /* Card background */
+    --smoky-700: oklch(0.28 0.015 50);  /* Borders & secondary elements */
+    --smoky-400: oklch(0.60 0.012 50);  /* Muted text */
+    --smoky-200: oklch(0.85 0.012 50);  /* Body text */
+    --smoky-100: oklch(0.93 0.01 50);   /* High contrast text / headings */
+    --smoky-50:  oklch(0.98 0.008 50);  /* Highlight text */
+
+    /* Accent: Soft Lilac */
+    --lilac-100: oklch(0.92 0.04 305);
+    --lilac-400: oklch(0.74 0.11 305);
+    --lilac-600: oklch(0.55 0.10 305);
+
+    /* Typography */
+    --font-heading: 'Cormorant Garamond', 'Outfit', system-ui, -apple-system, sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* Spacing Scale (clamp-based) */
+    --space-2xs: clamp(0.125rem, 0.3vw, 0.25rem);
+    --space-xs:  clamp(0.25rem, 0.6vw, 0.5rem);
+    --space-sm:  clamp(0.5rem, 1.2vw, 0.875rem);
+    --space-md:  clamp(0.875rem, 2vw, 1.5rem);
+    --space-lg:  clamp(1.5rem, 3.5vw, 2.5rem);
+    --space-xl:  clamp(2.5rem, 6vw, 4rem);
+    --space-2xl: clamp(4rem, 10vw, 7rem);
+
+    /* Border Radius - Softened */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.875rem;
+    --radius-lg: 1.5rem;
+    --radius-xl: 2.5rem;
+    --radius-pill: 100vmax;
+
+    /* Shadows (Multi-layered for realism with a touch of rose bleed) */
+    --shadow-sm: 0 1px 2px oklch(0.12 0.012 50 / 0.05);
+    --shadow-md: 
+      0 4px 6px -1px oklch(0.12 0.012 50 / 0.1), 
+      0 2px 4px -2px oklch(0.12 0.012 50 / 0.1);
+    --shadow-lg: 
+      0 10px 15px -3px oklch(0.72 0.13 15 / 0.06), 
+      0 4px 6px -4px oklch(0.12 0.012 50 / 0.1);
+    --shadow-xl: 
+      0 20px 25px -5px oklch(0.72 0.13 15 / 0.1), 
+      0 8px 10px -6px oklch(0.12 0.012 50 / 0.15);
+
+    /* Support light dark system */
+    color-scheme: dark light;
+  }
+
+  /* --- Tier 2: Semantic Tokens (Adaptive) --- */
+  :root {
+    --color-bg-primary:     light-dark(var(--smoky-50), var(--smoky-950));
+    --color-bg-secondary:   light-dark(var(--smoky-100), var(--smoky-900));
+    --color-bg-surface:     light-dark(oklch(0.95 0.008 50), var(--smoky-800));
+    --color-bg-glass:       light-dark(
+                              oklch(0.98 0.01 15 / 0.8),
+                              oklch(0.20 0.015 15 / 0.7)
+                            );
+    --color-text-primary:   light-dark(var(--smoky-950), var(--smoky-100));
+    --color-text-secondary: light-dark(var(--smoky-800), var(--smoky-200));
+    --color-text-muted:      light-dark(var(--smoky-400), var(--smoky-400));
+    --color-accent:         var(--rose-400);
+    --color-accent-hover:   var(--rose-600);
+    --color-border:         light-dark(oklch(0.85 0.01 15 / 0.5), oklch(0.30 0.015 15 / 0.5));
+    --color-teal:           var(--lilac-400);
+
+    /* Glassmorphism settings */
+    --glass-blur:  blur(24px);
+    --glass-border: 1px solid var(--color-border);
+  }
+
+  /* Force HTML class attributes if set */
+  html[data-theme="light"] {
+    color-scheme: light;
+    --color-bg-primary: var(--smoky-50);
+    --color-bg-secondary: var(--smoky-100);
+    --color-bg-surface: oklch(0.95 0.008 50);
+    --color-bg-glass: oklch(0.98 0.01 15 / 0.8);
+    --color-text-primary: var(--smoky-950);
+    --color-text-secondary: var(--smoky-800);
+    --color-border: oklch(0.85 0.01 15 / 0.5);
+  }
+
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --color-bg-primary: var(--smoky-950);
+    --color-bg-secondary: var(--smoky-900);
+    --color-bg-surface: var(--smoky-800);
+    --color-bg-glass: oklch(0.20 0.015 15 / 0.7);
+    --color-text-primary: var(--smoky-100);
+    --color-text-secondary: var(--smoky-200);
+    --color-border: oklch(0.30 0.015 15 / 0.5);
+  }
+}
+
+/* ── Base Styles Layer ── */
+@layer base {
+  body {
+    font-family: var(--font-body);
+    font-size: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+    line-height: 1.65;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    color: var(--color-text-primary);
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    font-size: clamp(2.25rem, 1rem + 5vw, 4.5rem);
+    text-wrap: balance;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  h2 {
+    font-size: clamp(1.5rem, 1rem + 3vw, 2.75rem);
+    text-wrap: balance;
+    font-weight: 700;
+  }
+
+  h3 {
+    font-size: clamp(1.2rem, 1rem + 1.5vw, 1.75rem);
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Prevent body text from running edge-to-edge on wide lines */
+  p, li {
+    max-width: 72ch;
+  }
+
+  /* Custom Focus Ring Management */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Accessible Interactive Elements — minimum 44×44px on touch */
+  button, a {
+    min-inline-size: 24px;
+    min-block-size: 24px;
+  }
+
+  @media (pointer: coarse) {
+    button, a {
+      min-inline-size: 44px;
+      min-block-size: 44px;
+    }
+  }
+
+  /* Scrollbar Customization */
+  * {
+    scrollbar-color: var(--color-border) transparent;
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: var(--radius-pill);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-text-muted);
+  }
+}
+
+/* ── Utilities Layer ── */
+@layer utilities {
+  /* Screen-reader only */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Gradient text — rose → lilac, brand editorial accent */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--rose-400) 0%, var(--lilac-400) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* ── Reduced Motion Media Query ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
