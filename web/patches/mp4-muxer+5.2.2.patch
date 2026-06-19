@@ -1,0 +1,13 @@
+diff --git a/node_modules/mp4-muxer/build/mp4-muxer.mjs b/node_modules/mp4-muxer/build/mp4-muxer.mjs
+index 6434a83..0504afd 100644
+--- a/node_modules/mp4-muxer/build/mp4-muxer.mjs
++++ b/node_modules/mp4-muxer/build/mp4-muxer.mjs
+@@ -388,7 +388,7 @@ var videoSampleDescription = (compressionType, track) => box(compressionType, [
+   // Pre-defined
+ ], [
+   VIDEO_CODEC_TO_CONFIGURATION_BOX[track.info.codec](track),
+-  track.info.decoderConfig.colorSpace ? colr(track) : null
++  track.info.decoderConfig && track.info.decoderConfig.colorSpace ? colr(track) : null
+ ]);
+ var COLOR_PRIMARIES_MAP = {
+   "bt709": 1,

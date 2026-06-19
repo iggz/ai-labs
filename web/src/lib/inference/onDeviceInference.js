@@ -171,13 +171,33 @@ export async function processVideoOnDevice(file, {
   const encResult = await createVideoEncoder(
     (chunk, meta) => {
       if (!muxer) return;
-      // mp4-muxer crashes if decoderConfig.colorSpace is null (Safari omits it).
-      // Sanitize: strip null/undefined colorSpace before handing off to muxer.
-      if (meta?.decoderConfig?.colorSpace == null && meta?.decoderConfig) {
-        const { colorSpace: _omit, ...dc } = meta.decoderConfig;
+      // mp4-muxer v5 line 391: `track.info.decoderConfig.colorSpace ? ...`
+      // This crashes when decoderConfig is null OR when colorSpace is null.
+      // Safari emits null decoderConfig on non-keyframes and null colorSpace on keyframes.
+      //
+      // Strategy:
+      //   - Non-keyframes: decoderConfig is expected to be absent — pass meta as-is,
+      //     mp4-muxer won't touch decoderConfig for these.
+      //   - Keyframes with null/missing decoderConfig: skip adding this chunk entirely
+      //     (losing this keyframe is better than crashing the entire encode).
+      //   - Keyframes with valid decoderConfig but null colorSpace: strip colorSpace.
+      if (chunk.type === 'key') {
+        if (!meta?.decoderConfig) {
+          // Safari sometimes sends null decoderConfig on keyframes — skip this chunk.
+          console.warn('[onDevice] keyframe missing decoderConfig, skipping chunk');
+          return;
+        }
+        // Strip null/undefined fields from decoderConfig — mp4-muxer accesses them unsafely
+        const dc = Object.fromEntries(
+          Object.entries(meta.decoderConfig).filter(([, v]) => v != null)
+        );
         meta = { ...meta, decoderConfig: dc };
       }
-      muxer.addVideoChunk(chunk, meta);
+      try {
+        muxer.addVideoChunk(chunk, meta);
+      } catch (e) {
+        console.error('[onDevice] addVideoChunk error:', e);
+      }
     },
     w, h
   );
