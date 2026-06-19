@@ -4,10 +4,13 @@ import * as ort from 'onnxruntime-web';
 const MODEL_INPUT_SIZE = 640;
 const CONF_THRESHOLD   = 0.25;
 const NMS_IOU          = 0.45;
-// In dev: serve model locally from public/models/ (no CORS issues)
-// In prod: model is hosted on GitHub Releases (44.6 MB — too large for Cloudflare 25 MB limit)
+// In dev: serve model locally from Vite middleware (no CORS issues)
+// In prod: use the Cloudflare Worker proxy at /ai-labs/models/ which:
+//   - Fetches from GitHub Releases (cached 7 days at CF edge)
+//   - Adds CORP: same-origin so COEP: require-corp doesn't block it
+//   - GitHub Releases lacks CORP/CORS headers → direct fetch blocked by COEP
 const MODEL_URL = import.meta.env.PROD
-  ? 'https://github.com/iggz/ai-labs/releases/download/v0.2.0-models/yolov8s-pose.onnx'
+  ? '/ai-labs/models/yolov8s-pose.onnx'
   : '/models/yolov8s-pose.onnx';
 
 // ── Typed array pool (reusable buffers to reduce GC pressure) ──

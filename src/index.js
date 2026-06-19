@@ -7,7 +7,18 @@
  *
  * We also inject COOP/COEP headers required for SharedArrayBuffer
  * (needed for ONNX Runtime WASM multi-threading).
+ *
+ * Special route: /ai-labs/models/yolov8s-pose.onnx
+ * → proxies from GitHub Releases, adding CORP header so COEP doesn't block it.
  */
+
+const GITHUB_MODEL_URL =
+  'https://github.com/iggz/ai-labs/releases/download/v0.2.0-models/yolov8s-pose.onnx';
+
+const COEP_HEADERS = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+};
 
 export default {
   async fetch(request, env) {
@@ -20,20 +31,47 @@ export default {
       path = path.slice(PREFIX.length) || '/';
     }
 
-    // Rewrite the URL to strip the prefix
+    // ── Special case: proxy the ONNX model so it becomes same-origin ──
+    // GitHub Releases doesn't send Cross-Origin-Resource-Policy or CORS headers,
+    // which COEP: require-corp blocks. Proxying through the worker makes it
+    // same-origin and adds the required COEP headers.
+    if (path === '/models/yolov8s-pose.onnx') {
+      const upstream = await fetch(GITHUB_MODEL_URL, {
+        // Pass through Range headers for resumable downloads / streaming
+        headers: request.headers.has('range')
+          ? { range: request.headers.get('range') }
+          : {},
+        cf: {
+          // Cache at Cloudflare edge for 7 days — avoids re-fetching 45 MB
+          cacheEverything: true,
+          cacheTtl: 604800,
+        },
+      });
+
+      const headers = new Headers(upstream.headers);
+      // Make it same-origin-safe under COEP: require-corp
+      headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+      // Add COEP/COOP to the model response too
+      for (const [k, v] of Object.entries(COEP_HEADERS)) headers.set(k, v);
+      // Allow browser caching of the model
+      headers.set('Cache-Control', 'public, max-age=604800, immutable');
+
+      return new Response(upstream.body, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers,
+      });
+    }
+
+    // ── Normal asset lookup: rewrite path, fetch from ASSETS ──
     const rewrittenUrl = new URL(url);
     rewrittenUrl.pathname = path;
-
     const rewrittenRequest = new Request(rewrittenUrl.toString(), request);
-
-    // Fetch from the static assets binding
     const response = await env.ASSETS.fetch(rewrittenRequest);
 
-    // Clone response and add COOP/COEP headers for SharedArrayBuffer support
-    // (required by ONNX Runtime WASM multi-threading)
+    // Inject COOP/COEP headers on every response
     const newHeaders = new Headers(response.headers);
-    newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
-    newHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
+    for (const [k, v] of Object.entries(COEP_HEADERS)) newHeaders.set(k, v);
 
     return new Response(response.body, {
       status: response.status,
