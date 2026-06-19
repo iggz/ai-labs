@@ -172,21 +172,25 @@ export function drawFrame(ctx, keypoints, confidences, angle, repCount,
   const CONF_MIN = 0.3;
 
   // ── Glow pass (bones) ──
+  // Use shadowBlur instead of ctx.filter='blur()' — filter triggers a full
+  // software render pass on iOS Safari which takes 200ms+. shadowBlur is
+  // GPU-accelerated on all platforms.
   ctx.save();
-  ctx.globalAlpha = 0.4;
-  ctx.filter = 'blur(4px)';
+  ctx.globalAlpha = 0.5;
+  ctx.shadowBlur  = 10;
   for (const [i, j] of SKELETON) {
     if (confidences[i] < CONF_MIN || confidences[j] < CONF_MIN) continue;
     const x1 = keypoints[i * 2], y1 = keypoints[i * 2 + 1];
     const x2 = keypoints[j * 2], y2 = keypoints[j * 2 + 1];
     if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) continue;
-
+    const color = boneColor(i, j);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
-    ctx.strokeStyle = boneColor(i, j);
-    ctx.lineWidth = 8;
-    ctx.lineCap = 'round';
+    ctx.strokeStyle  = color;
+    ctx.shadowColor  = color;
+    ctx.lineWidth    = 6;
+    ctx.lineCap      = 'round';
     ctx.stroke();
   }
   ctx.restore();

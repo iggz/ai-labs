@@ -1,19 +1,17 @@
 import * as ort from 'onnxruntime-web';
 
 // ── Constants ──
-const MODEL_INPUT_SIZE = 640;
+const MODEL_INPUT_SIZE = 416;   // 640→416: ~58% fewer FLOPs, same anchor-free YOLO output
 const CONF_THRESHOLD   = 0.25;
 const NMS_IOU          = 0.45;
-// In dev: serve model locally from Vite middleware (no CORS issues)
-// In prod: use the Cloudflare Worker proxy at /ai-labs/models/ which:
-//   - Fetches from GitHub Releases (cached 7 days at CF edge)
-//   - Adds CORP: same-origin so COEP: require-corp doesn't block it
-//   - GitHub Releases lacks CORP/CORS headers → direct fetch blocked by COEP
+// In dev: Vite middleware serves model locally from services/cv-engine/ (no CORS issues)
+// In prod: Cloudflare Worker proxies from GitHub Releases + adds CORP header
 const MODEL_URL = import.meta.env.PROD
   ? '/ai-labs/models/yolov8s-pose.onnx'
   : '/models/yolov8s-pose.onnx';
 
-// ── Typed array pool (reusable buffers to reduce GC pressure) ──
+// ── Typed array pool ──
+// Reused across frames to avoid GC pressure (3 channels × 416 × 416)
 const _chwBuf = new Float32Array(3 * MODEL_INPUT_SIZE * MODEL_INPUT_SIZE);
 
 // ── Singleton session ──
@@ -28,15 +26,16 @@ let _device  = null;  // 'webgpu' | 'wasm'
 export async function loadModel() {
   if (_session) return { session: _session, device: _device };
 
-  // Configure WASM file paths — use jsDelivr CDN to avoid Cloudflare's 25 MB asset limit
-  // (ort-wasm-simd-threaded.jsep.wasm is 26 MB, exceeds CF Workers max)
+  // WASM files served from jsDelivr CDN — avoids Cloudflare's 25 MB asset limit
   ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/';
-  // Disable multi-threading on Safari (SharedArrayBuffer restrictions)
-  ort.env.wasm.numThreads = typeof SharedArrayBuffer !== 'undefined' ? 4 : 1;
+  // Limit threads: mobile browsers restrict SharedArrayBuffer thread counts
+  ort.env.wasm.numThreads = typeof SharedArrayBuffer !== 'undefined'
+    ? Math.min(4, navigator.hardwareConcurrency || 2)
+    : 1;
 
   const providers = [];
 
-  // WebGPU feature detection
+  // WebGPU: available in Safari 17+ and Chrome. Test before adding.
   if (typeof navigator !== 'undefined' && navigator.gpu) {
     try {
       const adapter = await navigator.gpu.requestAdapter();
@@ -48,65 +47,89 @@ export async function loadModel() {
   _session = await ort.InferenceSession.create(MODEL_URL, {
     executionProviders: providers,
   });
-  _device = providers[0] === 'webgpu' && _session.handler?._ep === 'webgpu'
-    ? 'webgpu' : 'wasm';
+  _device = providers[0] === 'webgpu' ? 'webgpu' : 'wasm';
 
   return { session: _session, device: _device };
 }
 
 /**
- * Letterbox resize: preserves aspect ratio, pads with gray (114,114,114).
- * Returns CHW Float32Array normalized to [0,1] (reuses pooled buffer).
+ * Letterbox-resize an image source to MODEL_INPUT_SIZE × MODEL_INPUT_SIZE.
  *
- * @param {ImageData} imageData - Source frame
- * @param {number} size - Target square size (default 640)
- * @returns {{ data: Float32Array, scale: number, pad: [number, number] }}
+ * Uses createImageBitmap for GPU-accelerated resize when available, which:
+ *   - Avoids reading back a full-resolution frame (e.g. 1080p = 8.3 MB RGBA)
+ *   - Only reads back 416×416 (0.69 MB) — 12× less GPU→CPU transfer on mobile
+ *
+ * @param {HTMLVideoElement|ImageBitmap|ImageData} imageSource
+ * @param {number} [size=MODEL_INPUT_SIZE]
+ * @returns {Promise<{ data: Float32Array, scale: number, pad: [number, number] }>}
  */
-export function letterbox(imageData, size = MODEL_INPUT_SIZE) {
-  const { width: srcW, height: srcH, data: rgba } = imageData;
+export async function letterbox(imageSource, size = MODEL_INPUT_SIZE) {
+  // Determine source dimensions
+  let srcW, srcH;
+  if (imageSource instanceof ImageData) {
+    srcW = imageSource.width;
+    srcH = imageSource.height;
+  } else {
+    srcW = imageSource.videoWidth  ?? imageSource.displayWidth  ?? imageSource.width;
+    srcH = imageSource.videoHeight ?? imageSource.displayHeight ?? imageSource.height;
+  }
+
   const scale = Math.min(size / srcW, size / srcH);
-  const newW = Math.round(srcW * scale);
-  const newH = Math.round(srcH * scale);
-  const dw = Math.round((size - newW) / 2);
-  const dh = Math.round((size - newH) / 2);
+  const newW  = Math.round(srcW * scale);
+  const newH  = Math.round(srcH * scale);
+  const dw    = Math.round((size - newW) / 2);
+  const dh    = Math.round((size - newH) / 2);
 
-  // Use OffscreenCanvas if available (avoids main-thread jank on Safari)
-  let resizeCanvas, resizeCtx;
+  // Create output canvas (size × size, gray fill)
+  let outCanvas;
   if (typeof OffscreenCanvas !== 'undefined') {
-    resizeCanvas = new OffscreenCanvas(size, size);
-    resizeCtx = resizeCanvas.getContext('2d');
+    outCanvas = new OffscreenCanvas(size, size);
   } else {
-    resizeCanvas = document.createElement('canvas');
-    resizeCanvas.width = size;
-    resizeCanvas.height = size;
-    resizeCtx = resizeCanvas.getContext('2d');
+    outCanvas = document.createElement('canvas');
+    outCanvas.width = outCanvas.height = size;
+  }
+  const ctx = outCanvas.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = 'rgb(114,114,114)';
+  ctx.fillRect(0, 0, size, size);
+
+  if (imageSource instanceof ImageData) {
+    // Rare legacy path: put ImageData on a temp canvas then draw scaled
+    let tmp;
+    if (typeof OffscreenCanvas !== 'undefined') {
+      tmp = new OffscreenCanvas(srcW, srcH);
+    } else {
+      tmp = document.createElement('canvas');
+      tmp.width = srcW;
+      tmp.height = srcH;
+    }
+    tmp.getContext('2d').putImageData(imageSource, 0, 0);
+    ctx.drawImage(tmp, dw, dh, newW, newH);
+  } else if (typeof createImageBitmap !== 'undefined') {
+    // Fast path: GPU-accelerated resize via createImageBitmap compositor
+    // This avoids reading back the full-resolution frame to CPU
+    let bmp;
+    try {
+      bmp = await createImageBitmap(imageSource, {
+        resizeWidth:   newW,
+        resizeHeight:  newH,
+        resizeQuality: 'pixelated',  // fastest; adequate for pose detection
+      });
+      ctx.drawImage(bmp, dw, dh);
+    } finally {
+      bmp?.close();
+    }
+  } else {
+    // Fallback: drawImage with explicit target size (browser scales on GPU)
+    ctx.drawImage(imageSource, dw, dh, newW, newH);
   }
 
-  // Fill gray (114/255 ≈ 0.447)
-  resizeCtx.fillStyle = 'rgb(114, 114, 114)';
-  resizeCtx.fillRect(0, 0, size, size);
-
-  // Draw scaled source into letterbox position
-  let srcCanvas;
-  if (typeof OffscreenCanvas !== 'undefined') {
-    srcCanvas = new OffscreenCanvas(srcW, srcH);
-  } else {
-    srcCanvas = document.createElement('canvas');
-    srcCanvas.width = srcW;
-    srcCanvas.height = srcH;
-  }
-  const srcCtx = srcCanvas.getContext('2d');
-  srcCtx.putImageData(imageData, 0, 0);
-
-  resizeCtx.drawImage(srcCanvas, dw, dh, newW, newH);
-  const resized = resizeCtx.getImageData(0, 0, size, size);
-
-  // Convert RGBA → CHW Float32, normalized [0, 1] (reuse pooled buffer)
-  const pixels = resized.data;
-  for (let i = 0, j = 0; i < pixels.length; i += 4, j++) {
-    _chwBuf[j]                     = pixels[i]     / 255;  // R
-    _chwBuf[j + size * size]       = pixels[i + 1] / 255;  // G
-    _chwBuf[j + 2 * size * size]   = pixels[i + 2] / 255;  // B
+  // Read pixels and convert RGBA → CHW Float32 normalised [0, 1]
+  const { data: px } = ctx.getImageData(0, 0, size, size);
+  const ss = size * size;
+  for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+    _chwBuf[j]          = px[i]     / 255;  // R
+    _chwBuf[j + ss]     = px[i + 1] / 255;  // G
+    _chwBuf[j + 2 * ss] = px[i + 2] / 255;  // B
   }
 
   return { data: _chwBuf, scale, pad: [dw, dh] };
@@ -132,8 +155,7 @@ export function nms(boxes, scores, iouThreshold) {
     keep.push(i);
     for (const j of order) {
       if (suppressed.has(j) || j === i) continue;
-      const iou = _computeIoU(boxes[i], boxes[j]);
-      if (iou > iouThreshold) suppressed.add(j);
+      if (_computeIoU(boxes[i], boxes[j]) > iouThreshold) suppressed.add(j);
     }
   }
   return keep;
@@ -151,33 +173,33 @@ function _computeIoU(a, b) {
 }
 
 /**
- * Postprocess YOLO output (1, 56, 8400) → keypoints.
+ * Postprocess YOLO output tensor → keypoints for best detection.
+ * Works with any input size — uses output.dims[2] dynamically.
+ *
  * @param {ort.Tensor} output
  * @param {number} scale - Letterbox scale factor
  * @param {[number, number]} pad - Letterbox padding [dw, dh]
  * @returns {{ keypoints: Float32Array, confidences: Float32Array, bbox: number[], score: number } | null}
  */
 export function postprocess(output, scale, pad) {
-  // output shape: [1, 56, 8400] → transpose to [8400, 56]
-  const raw = output.data;     // Float32Array
-  const cols = output.dims[2]; // 8400
-  const rows = output.dims[1]; // 56
+  const raw  = output.data;      // Float32Array
+  const cols = output.dims[2];   // e.g. 3549 for 416×416, 8400 for 640×640
+  const rows = output.dims[1];   // 56
 
-  const boxes = [];
-  const scores = [];
+  const boxes   = [];
+  const scores  = [];
   const allData = [];
 
   for (let c = 0; c < cols; c++) {
-    const conf = raw[4 * cols + c];  // objectness at row 4
+    const conf = raw[4 * cols + c];  // objectness score at row 4
     if (conf < CONF_THRESHOLD) continue;
 
-    // Box: cx, cy, w, h → x1, y1, x2, y2
     const cx = raw[0 * cols + c];
     const cy = raw[1 * cols + c];
-    const w  = raw[2 * cols + c];
-    const h  = raw[3 * cols + c];
+    const bw = raw[2 * cols + c];
+    const bh = raw[3 * cols + c];
 
-    boxes.push([cx - w/2, cy - h/2, cx + w/2, cy + h/2]);
+    boxes.push([cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2]);
     scores.push(conf);
     allData.push(c);
   }
@@ -187,46 +209,48 @@ export function postprocess(output, scale, pad) {
   const kept = nms(boxes, scores, NMS_IOU);
   if (kept.length === 0) return null;
 
-  // Take best detection
   const bestIdx = kept[0];
   const bestCol = allData[bestIdx];
 
-  // Extract 17 keypoints: rows 5..55, stride 3 (x, y, conf)
+  // Extract 17 COCO keypoints: rows 5..55, stride 3 (x, y, visibility)
   const keypoints   = new Float32Array(34);
   const confidences = new Float32Array(17);
 
   for (let k = 0; k < 17; k++) {
-    const kx   = raw[(5 + k * 3    ) * cols + bestCol];
-    const ky   = raw[(5 + k * 3 + 1) * cols + bestCol];
-    const kc   = raw[(5 + k * 3 + 2) * cols + bestCol];
+    const kx = raw[(5 + k * 3)     * cols + bestCol];
+    const ky = raw[(5 + k * 3 + 1) * cols + bestCol];
+    const kc = raw[(5 + k * 3 + 2) * cols + bestCol];
 
     // Map back to original image space
-    keypoints[k * 2    ] = (kx - pad[0]) / scale;
+    keypoints[k * 2]     = (kx - pad[0]) / scale;
     keypoints[k * 2 + 1] = (ky - pad[1]) / scale;
-    confidences[k] = kc;
+    confidences[k]       = kc;
   }
 
   return {
     keypoints,
     confidences,
-    bbox: boxes[bestIdx].map((v, i) => (v - pad[i % 2 === 0 ? 0 : 1]) / scale),
+    bbox:  boxes[bestIdx].map((v, i) => (v - pad[i % 2 === 0 ? 0 : 1]) / scale),
     score: scores[bestIdx],
   };
 }
 
 /**
  * Full inference pipeline for one frame.
- * @param {ImageData} imageData
+ * Accepts any image source (HTMLVideoElement, ImageBitmap, ImageData).
+ *
+ * @param {HTMLVideoElement|ImageBitmap|ImageData} imageSource
  * @returns {Promise<{ keypoints: Float32Array(34), confidences: Float32Array(17), bbox: number[], score: number } | null>}
  */
-export async function inferFrame(imageData) {
+export async function inferFrame(imageSource) {
   const { session } = await loadModel();
-  const { data, scale, pad } = letterbox(imageData);
+  const { data, scale, pad } = await letterbox(imageSource);
 
-  const tensor = new ort.Tensor('float32', data, [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
-  const feeds = { [session.inputNames[0]]: tensor };
+  const tensor = new ort.Tensor('float32', data,
+    [1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
+  const feeds   = { [session.inputNames[0]]: tensor };
   const results = await session.run(feeds);
-  const output = results[session.outputNames[0]];
+  const output  = results[session.outputNames[0]];
 
   return postprocess(output, scale, pad);
 }

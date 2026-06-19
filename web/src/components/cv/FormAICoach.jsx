@@ -289,10 +289,26 @@ function ConfigureAndUploadStep({
 function ProcessingStep({ progress, protocol }) {
   const isOnDevice = protocol === 'on-device';
 
+  const inferFrames = progress?.totalFrames || 0;
+  const framesProcessed = progress?.framesProcessed || 0;
+
+  // Estimate time remaining based on FRAME_STRIDE=2, 15fps output
+  let timeRemaining = null;
+  if (progress?.phase === 'processing' && progress.startTime && framesProcessed > 2) {
+    const elapsed = (Date.now() - progress.startTime) / 1000;
+    const rate = framesProcessed / elapsed;
+    const remaining = (inferFrames - framesProcessed) / rate;
+    if (remaining > 3) {
+      timeRemaining = remaining < 60
+        ? `~${Math.ceil(remaining)}s left`
+        : `~${Math.ceil(remaining / 60)}m left`;
+    }
+  }
+
   // Compute progress bar percentage
   let pct;
-  if (progress?.phase === 'processing' && progress.totalFrames) {
-    pct = Math.round((progress.framesProcessed / progress.totalFrames) * 80) + 10;
+  if (progress?.phase === 'processing' && inferFrames) {
+    pct = Math.round((framesProcessed / inferFrames) * 80) + 10;
   } else if (progress?.phase === 'loading_model') {
     pct = 8;
   } else if (progress?.phase === 'queued') {
@@ -322,9 +338,12 @@ function ProcessingStep({ progress, protocol }) {
       {progress?.phase === 'loading_model' && (
         <p className="formai-processing__frames">Loading AI model into browser…</p>
       )}
-      {progress?.phase === 'processing' && progress.totalFrames && (
+      {progress?.phase === 'processing' && inferFrames && (
         <p className="formai-processing__frames">
-          Frame {progress.framesProcessed} / {progress.totalFrames}
+          Frame {framesProcessed} / {inferFrames}
+          {timeRemaining && (
+            <span className="formai-processing__eta">{timeRemaining}</span>
+          )}
           {progress.device && (
             <span className="formai-processing__device-badge">
               {progress.device === 'webgpu' ? '⚡ WebGPU' : '🔧 WASM'}
@@ -661,11 +680,12 @@ export function FormAICoach() {
       let res;
       if (protocol === 'on-device') {
         const { processVideoOnDevice } = await import('../../lib/inference/onDeviceInference.js');
+        const startTime = Date.now();
         res = await processVideoOnDevice(file, {
           exerciseType,
           overlayMode,
           cameraAngle,
-          onProgress: (prog) => setProgress(prog),
+          onProgress: (prog) => setProgress({ ...prog, startTime }),
         });
       } else {
         res = await submitAnalysis(
