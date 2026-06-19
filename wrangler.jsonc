@@ -11,5 +11,11 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "routes": [
+    {
+      "pattern": "ilovetoridemybicycle.com/ai-labs*",
+      "zone_id": "0a3a58000de0c118405d1cea7f5797f8"
+    }
   ]
 }

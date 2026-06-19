@@ -16,7 +16,7 @@ import SmartFitPage from './pages/SmartFitPage';
 export default function App() {
   return (
     <HelmetProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/ai-labs">
         <Navbar />
         <Routes>
           <Route path="/" element={<HomePage />} />

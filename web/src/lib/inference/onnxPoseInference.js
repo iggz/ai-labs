@@ -4,7 +4,8 @@ import * as ort from 'onnxruntime-web';
 const MODEL_INPUT_SIZE = 640;
 const CONF_THRESHOLD   = 0.25;
 const NMS_IOU          = 0.45;
-const MODEL_URL        = '/models/yolov8s-pose.onnx';
+// Model hosted on GitHub Releases (44.6 MB — exceeds Cloudflare Workers 25 MB asset limit)
+const MODEL_URL = 'https://github.com/iggz/ai-labs/releases/download/v0.2.0-models/yolov8s-pose.onnx';
 
 // ── Typed array pool (reusable buffers to reduce GC pressure) ──
 const _chwBuf = new Float32Array(3 * MODEL_INPUT_SIZE * MODEL_INPUT_SIZE);
