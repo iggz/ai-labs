@@ -46,23 +46,7 @@
   z-index: 2;
 }
 
-@media (min-width: 1024px) {
-  .ai-labs__container {
-    display: grid;
-    grid-template-columns: 4.8fr 7.2fr;
-    gap: 4.5rem;
-    align-items: start;
-    padding-top: 5rem;
-  }
-  
-  .ai-labs__sidebar {
-    position: sticky;
-    top: 100px;
-    display: flex;
-    flex-direction: column;
-    gap: 2.25rem;
-  }
-}
+
 
 /* Hero */
 .ai-labs__hero {
@@ -116,183 +100,7 @@
   pointer-events: none;
 }
 
-/* Tab Navigation */
-.ai-labs__tabs {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0;
-}
 
-.ai-labs__tab {
-  display: flex;
-  align-items: center;
-  text-align: left;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  border-radius: var(--cv-radius-md);
-  border: 1px solid var(--cv-border);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--cv-text-muted);
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  width: 100%;
-}
-
-.ai-labs__tab:hover {
-  background: var(--cv-lilac-soft);
-  border-color: var(--cv-lilac);
-  transform: translateX(4px);
-}
-
-.ai-labs__tab--active {
-  background: var(--cv-rose-soft);
-  border-color: var(--cv-rose);
-  box-shadow: 0 4px 20px oklch(from var(--cv-rose) l c h / 0.12);
-}
-
-.ai-labs__tab--active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 25%;
-  height: 50%;
-  width: 4px;
-  background: var(--cv-rose);
-  border-radius: 0 4px 4px 0;
-}
-
-.ai-labs__tab-emoji {
-  font-size: 1.4rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 0.4rem;
-  border-radius: var(--cv-radius-sm);
-  border: 1px solid var(--cv-border);
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.ai-labs__tab:hover .ai-labs__tab-emoji {
-  border-color: var(--cv-lilac);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.ai-labs__tab--active .ai-labs__tab-emoji {
-  border-color: var(--cv-rose);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.ai-labs__tab-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.ai-labs__tab-label {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--cv-text);
-  transition: color 0.2s;
-}
-
-.ai-labs__tab--active .ai-labs__tab-label {
-  color: var(--cv-rose);
-}
-
-.ai-labs__tab-summary {
-  font-size: 0.78rem;
-  color: var(--cv-text-muted);
-  font-weight: 400;
-  transition: color 0.2s;
-  white-space: normal;
-  line-height: 1.3;
-}
-
-.ai-labs__tab--active .ai-labs__tab-summary {
-  color: var(--cv-text);
-}
-
-.ai-labs__tab-badge {
-  position: absolute;
-  top: -6px;
-  right: 12px;
-  background: var(--cv-rose);
-  color: white;
-  font-size: 0.6rem;
-  font-weight: 700;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* Tool Description Callout */
-.ai-labs__tool-desc {
-  padding: 0;
-  border-left: 2px solid var(--cv-lilac);
-  padding-left: 1.25rem;
-}
-.ai-labs__tool-tagline {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--cv-lilac);
-  display: block;
-  margin-bottom: 0.4rem;
-}
-.ai-labs__tool-description {
-  font-size: 0.9rem;
-  color: var(--cv-text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
-
-/* Content + Panels */
-.ai-labs__main {
-  width: 100%;
-}
-.ai-labs__content {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-}
-.ai-labs__panel[hidden] { display: none; }
-.ai-labs__panel {
-  animation: panel-in 0.3s ease;
-  scroll-margin-top: 100px;
-}
-@keyframes panel-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* Privacy Footer */
-.ai-labs__privacy-footer {
-  padding: 0;
-  margin-top: 1rem;
-}
-.ai-labs__privacy-footer p {
-  font-size: 0.8rem;
-  color: var(--cv-text-muted);
-  line-height: 1.5;
-  margin: 0;
-}
-.ai-labs__privacy-footer a {
-  color: var(--cv-rose);
-  text-decoration: none;
-  font-weight: 500;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.2s;
-}
-.ai-labs__privacy-footer a:hover {
-  border-color: var(--cv-rose);
-}
 
 /* ── Shared CV Step Styles ────────────────────────────────────────────────── */
 .formai-step,
@@ -436,41 +244,6 @@
 }
 
 
-/* Exercise grid */
-.formai-exercise-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-}
-.formai-exercise-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.9rem 0.5rem;
-  border-radius: var(--cv-radius-md);
-  border: 1px solid var(--cv-border);
-  background: transparent;
-  color: var(--cv-text-muted);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-}
-.formai-exercise-btn:hover {
-  border-color: var(--cv-lilac);
-  background: var(--cv-lilac-soft);
-  color: var(--cv-text);
-}
-.formai-exercise-btn.active {
-  border-color: var(--cv-rose);
-  background: var(--cv-rose-soft);
-  color: var(--cv-rose);
-  box-shadow: 0 0 16px var(--cv-rose-glow);
-}
-.formai-exercise-btn__icon { font-size: 1.6rem; }
-.formai-exercise-btn__label { font-size: 0.82rem; font-weight: 600; }
-.formai-exercise-btn__desc { font-size: 0.7rem; color: var(--cv-text-muted); line-height: 1.3; }
-
 /* Drop zone */
 .formai-drop-zone {
   border: 2px dashed var(--cv-border);
@@ -522,6 +295,34 @@
   gap: 0.35rem;
   justify-content: center;
 }
+.formai-processing__frames {
+  font-size: 0.85rem;
+  color: var(--cv-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.formai-processing__device-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: oklch(0.18 0.04 290 / 0.8);
+  border: 1px solid var(--cv-border);
+  color: var(--cv-lilac);
+  letter-spacing: 0.03em;
+}
+.formai-processing__fallback-note {
+  font-size: 0.75rem;
+  color: var(--cv-amber);
+  text-align: center;
+}
+
 
 /* Progress bar */
 .formai-progress-bar {
@@ -832,12 +633,10 @@
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  .formai-exercise-grid { grid-template-columns: 1fr; }
   .formai-stats-row { grid-template-columns: 1fr; }
   .slingshot-features { grid-template-columns: 1fr 1fr; }
   .slingshot-actions { flex-direction: column; }
   .smartfit-garment-grid { grid-template-columns: 1fr; }
-  .ai-labs__tabs { padding: 0 1rem; }
 }
 
 /* ── Mobile AI Labs layout overhaul ───────────────────────────────────────── */
@@ -876,91 +675,6 @@
     color: var(--cv-text-muted);
   }
 
-  /* Tabs nav: full width, comfortable gaps between cards */
-  .ai-labs__tabs {
-    padding: 0;
-    gap: 0.65rem;
-    margin-bottom: 1.75rem;
-  }
-
-  /* Each tab card: taller, more generous internal padding */
-  .ai-labs__tab {
-    padding: 1rem 1.1rem;
-    gap: 0.9rem;
-    border-radius: 14px;
-  }
-
-  /* Emoji icon box: slightly larger on mobile */
-  .ai-labs__tab-emoji {
-    font-size: 1.5rem;
-    padding: 0.5rem;
-    min-width: 2.6rem;
-    min-height: 2.6rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* Tab label text: slightly bigger for readability */
-  .ai-labs__tab-label {
-    font-size: 1rem;
-    font-weight: 700;
-  }
-
-  /* Tab summary: comfortable size */
-  .ai-labs__tab-summary {
-    font-size: 0.82rem;
-    line-height: 1.45;
-    margin-top: 0.15rem;
-  }
-
-  /* Badge chips (BETA / NEW): push them away from the edge */
-  .ai-labs__tab-badge {
-    top: -7px;
-    right: 10px;
-    font-size: 0.58rem;
-    padding: 0.12rem 0.45rem;
-  }
-
-  /* Tool description callout: more top margin, bigger text */
-  .ai-labs__tool-desc {
-    margin-bottom: 1.75rem;
-    padding-left: 1.1rem;
-    border-left-width: 3px;
-  }
-
-  .ai-labs__tool-tagline {
-    font-size: 0.72rem;
-    margin-bottom: 0.5rem;
-    letter-spacing: 0.09em;
-  }
-
-  .ai-labs__tool-description {
-    font-size: 0.92rem;
-    line-height: 1.6;
-  }
-
-  /* Privacy footer: more breathing room at the top */
-  .ai-labs__privacy-footer {
-    margin-top: 1.75rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--cv-border);
-  }
-
-  .ai-labs__privacy-footer p {
-    font-size: 0.8rem;
-    line-height: 1.6;
-  }
-
-  /* Hide developer settings panel on mobile — not relevant for users */
-  .ai-labs__connection-settings {
-    display: none;
-  }
-
-  /* Active tool panel: no extra gap at top */
-  .ai-labs__main {
-    margin-top: 0;
-  }
 
   /* CV step cards: reduce padding on mobile for tighter screens */
   .formai-step,
@@ -976,19 +690,6 @@
     padding: 2rem 1rem;
   }
 
-  /* Exercise grid: single column on tight screens */
-  .formai-exercise-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.6rem;
-  }
-
-  .formai-exercise-btn {
-    padding: 0.75rem 0.4rem;
-  }
-
-  .formai-exercise-btn__desc {
-    display: none; /* Too small at 390px — hide the subtitle */
-  }
 }
 
 /* Extra tight phones (< 390px) */
@@ -1001,13 +702,6 @@
     font-size: 1.85rem;
   }
 
-  .formai-exercise-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .formai-exercise-btn__desc {
-    display: block;
-  }
 }
 
 
@@ -1422,121 +1116,6 @@
   .stats-sparkline__bar { width: 12px; }
 }
 
-/* ── Developer Connection Settings ────────────────────────────────────────── */
-.ai-labs__connection-settings {
-  margin-top: 1.5rem;
-  border-top: 1px solid var(--cv-border);
-  padding-top: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.ai-labs__settings-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: none;
-  border: none;
-  color: var(--cv-text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.2s;
-  text-align: left;
-}
-
-.ai-labs__settings-btn:hover {
-  color: var(--cv-rose);
-}
-
-.ai-labs__settings-btn svg.spin {
-  animation: cv-spin 4s linear infinite;
-}
-
-@keyframes cv-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.ai-labs__settings-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  background: var(--cv-dark-card);
-  padding: 1rem;
-  border-radius: var(--cv-radius-md);
-  border: 1px solid var(--cv-border);
-}
-
-.ai-labs__settings-help {
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--cv-text-muted);
-  margin: 0;
-}
-
-.ai-labs__settings-help code {
-  background: rgba(255, 255, 255, 0.05);
-  padding: 0.1rem 0.25rem;
-  border-radius: 4px;
-  font-family: monospace;
-}
-
-.ai-labs__settings-input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-@media (min-width: 480px) {
-  .ai-labs__settings-input-group {
-    flex-direction: row;
-    align-items: center;
-  }
-}
-
-.ai-labs__settings-input {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--cv-border);
-  border-radius: var(--cv-radius-sm);
-  color: var(--cv-text);
-  padding: 0.4rem 0.75rem;
-  font-size: 0.85rem;
-  transition: all 0.2s;
-}
-
-.ai-labs__settings-input:focus {
-  border-color: var(--cv-rose);
-  outline: none;
-  box-shadow: 0 0 8px var(--cv-rose-glow);
-}
-
-.ai-labs__settings-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.ai-labs__settings-actions .btn--sm {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.75rem;
-  height: auto;
-}
-
-.ai-labs__settings-status {
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.ai-labs__settings-status.success {
-  color: var(--cv-mint);
-}
-
-.ai-labs__settings-status.info {
-  color: var(--cv-lilac);
-}
 
 /* Video Actions and Download Button */
 .formai-video-actions {
@@ -1746,31 +1325,6 @@
    Upload Guidance, Detection Badge, Stat Tooltips
    ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Exercise grid: 4 columns on desktop (incl. Auto-Detect) ─────────────── */
-.formai-exercise-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.75rem;
-}
-
-@media (max-width: 600px) {
-  .formai-exercise-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 389px) {
-  .formai-exercise-grid { grid-template-columns: 1fr; }
-}
-
-/* Auto-Detect button: subtle gradient border to signal it's special */
-.formai-exercise-btn--auto {
-  border-color: var(--cv-lilac);
-  background: linear-gradient(135deg, oklch(0.19 0.015 310), oklch(0.19 0.025 290));
-}
-.formai-exercise-btn--auto.active {
-  border-color: var(--cv-lilac);
-  background: var(--cv-lilac-soft);
-  color: var(--cv-lilac);
-  box-shadow: 0 0 16px oklch(0.76 0.09 310 / 0.25);
-}
 
 /* ── Configure step ──────────────────────────────────────────────────────── */
 .formai-configure {
@@ -2079,4 +1633,866 @@
     padding: 0.45rem 0.75rem;
     font-size: 0.8rem;
   }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Phase 1 additions
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Segmented control (compact pill row) ─────────────────────────────────── */
+.formai-segmented {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.formai-segmented__btn {
+  padding: 7px 14px;
+  border-radius: var(--cv-radius-sm);
+  border: 1px solid var(--cv-border);
+  background: oklch(0.16 0.02 290 / 0.7);
+  color: var(--cv-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  min-inline-size: auto;
+  min-block-size: auto;
+}
+
+.formai-segmented__btn:hover:not(.active):not(.disabled) {
+  color: var(--cv-text);
+  border-color: oklch(0.40 0.04 290);
+  background: oklch(0.20 0.025 290);
+}
+
+.formai-segmented__btn.active {
+  background: var(--cv-rose);
+  color: #fff;
+  border-color: var(--cv-rose);
+  box-shadow: 0 0 12px var(--cv-rose-glow);
+}
+
+.formai-segmented__btn.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* On Device pill — subtle rose-glow ring to distinguish */
+.formai-segmented__btn--on-device.active {
+  background: linear-gradient(135deg, var(--cv-rose) 0%, var(--cv-lilac) 100%);
+  box-shadow: 0 0 16px var(--cv-rose-glow);
+}
+
+/* ── Privacy badge ────────────────────────────────────────────────────────── */
+.formai-privacy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.formai-privacy-badge--on-device {
+  background: oklch(0.78 0.15 160 / 0.15);
+  color: var(--cv-mint);
+  border: 1px solid oklch(0.78 0.15 160 / 0.35);
+}
+
+.formai-privacy-badge--server {
+  background: oklch(0.25 0.02 290 / 0.5);
+  color: var(--cv-text-muted);
+  border: 1px solid var(--cv-border);
+}
+
+/* ── Feature disclosure ───────────────────────────────────────────────────── */
+.feature-disclosure {
+  border: 1px solid oklch(0.72 0.13 15 / 0.25);
+  border-radius: var(--cv-radius-md);
+  background: oklch(0.19 0.025 15 / 0.5);
+  padding: 0.875rem 1rem;
+  animation: fadeSlideIn 0.3s ease;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.feature-disclosure__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.625rem;
+}
+
+.feature-disclosure__title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--cv-text);
+}
+
+.feature-disclosure__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--cv-text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+  min-inline-size: auto;
+  min-block-size: auto;
+}
+
+.feature-disclosure__close:hover {
+  color: var(--cv-text);
+}
+
+.feature-disclosure__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.75rem;
+}
+
+.feature-disclosure__col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.feature-disclosure__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.feature-disclosure__item--yes { color: var(--cv-mint); }
+.feature-disclosure__item--no  { color: var(--cv-text-muted); }
+
+.feature-disclosure__check {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.feature-disclosure__footer {
+  margin-top: 0.625rem;
+  font-size: 0.72rem;
+  color: var(--cv-text-muted);
+  max-width: none;
+}
+
+.feature-disclosure__settings-hint {
+  color: var(--cv-rose);
+}
+
+/* ── Info popover ─────────────────────────────────────────────────────────── */
+.info-popover__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cv-text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 2px;
+  transition: color 0.15s ease;
+  min-inline-size: auto;
+  min-block-size: auto;
+}
+
+.info-popover__trigger:hover {
+  color: var(--cv-text);
+}
+
+.info-popover__content {
+  background: var(--cv-dark-card);
+  border: 1px solid var(--cv-rose);
+  border-radius: var(--cv-radius-md);
+  padding: 0.75rem 1rem;
+  max-width: 320px;
+  font-size: 0.82rem;
+  color: var(--cv-text);
+  line-height: 1.5;
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.5);
+}
+
+.info-popover__content p {
+  max-width: none;
+  margin: 0;
+}
+
+/* ── Unified configure step ───────────────────────────────────────────────── */
+.formai-configure-unified {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.formai-configure__heading {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cv-text);
+  margin-bottom: 0.25rem;
+}
+
+.formai-configure__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formai-configure__label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.formai-configure__section-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cv-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.formai-configure__guidance {
+  font-size: 0.78rem;
+  color: var(--cv-text-muted);
+  margin: 0;
+  max-width: none;
+}
+
+.formai-configure__cta {
+  margin-top: 0.25rem;
+}
+
+/* Mobile: fill viewport height */
+@media (max-width: 767px) {
+  .formai-coach {
+    min-height: calc(100dvh - var(--nav-height-mobile, 60px) - env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Home page — single-screen, no scroll ────────────────────────────────── */
+/*
+ * Strategy: .home-page fills the scroll container exactly (height:100%).
+ * Inside it's a flex column. The container is the flex child that grows to
+ * fill remaining space (flex:1 / min-height:0). Everything uses clamp() so
+ * it scales across phone portrait → desktop without ever overflowing.
+ */
+.home-page {
+  /* Override the default overflow-y:auto from .ai-labs — we DON'T want scroll */
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-page__container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  padding: clamp(0.75rem, 2.5vh, 2rem) clamp(1rem, 4vw, 2rem);
+  position: relative;
+  z-index: 2;
+  gap: clamp(0.5rem, 1.5vh, 1.25rem);
+}
+
+.home-page__hero {
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Scale headline down aggressively on small screens */
+.home-page .ai-labs__headline {
+  font-size: clamp(1.75rem, 5vw + 1vh, 3.5rem);
+  margin-bottom: 0.2em;
+}
+
+.home-page .ai-labs__subhead {
+  font-size: clamp(0.78rem, 1.5vw + 0.5vh, 1rem);
+  margin: 0;
+  max-width: 52ch;
+  margin-inline: auto;
+}
+
+.home-page .ai-labs__badge {
+  margin-bottom: 0.4em;
+  font-size: clamp(0.68rem, 1.2vw, 0.8rem);
+}
+
+.home-page__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(0.5rem, 1.5vh, 1rem);
+  flex: 1;
+  min-height: 0;
+}
+
+@media (min-width: 768px) {
+  .home-page__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.home-page__card {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.25rem, 0.8vh, 0.5rem);
+  padding: clamp(0.75rem, 2vh, 1.5rem);
+  border-radius: var(--cv-radius-lg);
+  border: 1px solid var(--cv-border);
+  background: var(--cv-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  text-decoration: none;
+  color: var(--cv-text);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.home-page__card:hover {
+  transform: translateY(-3px);
+  border-color: var(--card-accent, var(--cv-rose));
+  box-shadow: 0 10px 32px oklch(0 0 0 / 0.4), 0 0 0 1px var(--card-accent, var(--cv-rose));
+}
+
+.home-page__card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.home-page__card-emoji {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  line-height: 1;
+}
+
+.home-page__card-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--cv-rose-soft);
+  border: 1px solid var(--cv-rose);
+  color: var(--cv-rose);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.home-page__card-title {
+  font-size: clamp(0.95rem, 2vw, 1.2rem);
+  font-weight: 700;
+  color: var(--cv-text);
+  margin: 0;
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  flex-shrink: 0;
+}
+
+.home-page__card-tagline {
+  font-size: clamp(0.7rem, 1.2vw, 0.82rem);
+  font-weight: 600;
+  color: var(--card-accent, var(--cv-rose));
+  margin: 0;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.home-page__card-desc {
+  font-size: clamp(0.72rem, 1.1vw, 0.83rem);
+  color: var(--cv-text-muted);
+  line-height: 1.45;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  max-width: none;
+}
+
+.home-page__card-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: clamp(0.7rem, 1.1vw, 0.82rem);
+  font-weight: 700;
+  color: var(--card-accent, var(--cv-rose));
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.home-page__footer {
+  text-align: center;
+  font-size: clamp(0.68rem, 1vw, 0.8rem);
+  color: var(--cv-text-muted);
+  max-width: 60ch;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+
+.home-page__footer p {
+  max-width: none;
+  margin: 0;
+}
+
+/* ── FormAI Setup Page ────────────────────────────────────────────────────── */
+.formai-setup-page__container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 3rem) 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: relative;
+  z-index: 2;
+}
+
+.formai-setup-page__card {
+  background: var(--cv-dark-card);
+  border: 1px solid var(--cv-border);
+  border-radius: var(--cv-radius-lg);
+  padding: 1.5rem;
+}
+
+.formai-setup-page__card--camera {
+  border-top: 3px solid var(--cv-mint);
+}
+
+.formai-setup-page__card--liability {
+  border-left: 3px solid var(--cv-border);
+  background: oklch(0.12 0.015 290 / 0.6);
+}
+
+.formai-setup-page__angle-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cv-text-muted);
+  margin: 1rem 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.formai-setup-page__angle-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.formai-setup-page__angle-table th {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  color: var(--cv-text-muted);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--cv-border);
+}
+
+.formai-setup-page__angle-table td {
+  padding: 0.35rem 0.5rem;
+  color: var(--cv-text);
+  border-bottom: 1px solid oklch(0.20 0.02 290 / 0.4);
+}
+
+.formai-setup-page__detail {
+  margin-top: 0.875rem;
+}
+
+.formai-setup-page__detail-summary {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--cv-rose);
+  cursor: pointer;
+  list-style: none;
+  padding: 0.5rem 0;
+}
+
+.formai-setup-page__detail-summary::marker,
+.formai-setup-page__detail-summary::-webkit-details-marker {
+  display: none;
+}
+
+.formai-setup-page__detail-summary::before {
+  content: '▶ ';
+  font-size: 0.7em;
+}
+
+details[open] .formai-setup-page__detail-summary::before {
+  content: '▼ ';
+}
+
+.formai-setup-page__detail-body {
+  font-size: 0.8rem;
+  color: var(--cv-text-muted);
+  line-height: 1.6;
+  padding-top: 0.5rem;
+  max-width: none;
+}
+
+/* Desktop: add top padding equal to navbar height on all cv pages */
+@media (min-width: 768px) {
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Phase 1.2 — Iteration fixes
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Desktop top nav: sticky nav is in normal flow, no extra padding needed ── */
+/* Override the earlier rule that added double-spacing */
+@media (min-width: 768px) {
+  .ai-labs {
+    padding-top: 0;
+  }
+}
+
+/* ── Centered Processing step ─────────────────────────────────────────────── */
+.formai-processing-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1.25rem;
+  padding: 2.5rem 2rem;
+  /* Fill the viewport minus bottom nav on mobile */
+  min-height: calc(100dvh - var(--nav-height-mobile, 60px) - env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .formai-processing-centered {
+    /* Fill the viewport minus the sticky top nav on desktop */
+    min-height: calc(100dvh - var(--nav-height-desktop, 56px));
+  }
+}
+
+/* ── Results v2 — fixed-position two-tab layout ───────────────────────────── */
+.formai-results-v2 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Mobile: stop above the bottom tab bar */
+  bottom: calc(var(--nav-height-mobile, 60px) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  background: var(--cv-dark);
+  z-index: 10;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .formai-results-v2 {
+    /* Desktop: start below the sticky top nav */
+    top: var(--nav-height-desktop, 56px);
+    bottom: 0;
+  }
+}
+
+/* Tab strip */
+.formai-results-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--cv-border);
+  flex-shrink: 0;
+  background: var(--cv-dark);
+}
+
+.formai-results-tab {
+  flex: 1;
+  padding: 0.9rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cv-text-muted);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  min-inline-size: auto;
+  min-block-size: auto;
+  white-space: nowrap;
+}
+
+.formai-results-tab:hover:not(:disabled) {
+  color: var(--cv-text);
+}
+
+.formai-results-tab.active {
+  color: var(--cv-rose);
+  border-bottom-color: var(--cv-rose);
+}
+
+.formai-results-tab:disabled,
+.formai-results-tab--loading {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Spinner on Video tab while buffering */
+.formai-tab-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spinTab 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spinTab {
+  to { transform: rotate(360deg); }
+}
+
+/* Hides a tab panel without unmounting */
+.formai-panel--hidden {
+  display: none !important;
+}
+
+/* Dashboard panel (scrolls internally) */
+.formai-results-panel {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  /* Prevent content from extending under the panel */
+  min-height: 0;
+}
+
+/* Video panel */
+.formai-results-video-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.formai-results-video-full {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  object-fit: contain;
+  background: #000;
+  display: block;
+}
+
+.formai-results-video-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--cv-dark-card);
+  border-top: 1px solid var(--cv-border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Setup page — sticky footer, scroll area ──────────────────────────────── */
+.formai-setup-page__fixed-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--nav-height-mobile, 60px) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  background: var(--cv-dark);
+  z-index: 10;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .formai-setup-page__fixed-wrapper {
+    top: var(--nav-height-desktop, 56px);
+    bottom: 0;
+  }
+}
+
+.formai-setup-page__scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+.formai-setup-page__inner-content {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formai-setup-page__sticky-footer {
+  flex-shrink: 0;
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--cv-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: oklch(0.12 0.015 290 / 0.97);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Format selector (segmented control in settings modal) ────────────────── */
+.format-selector {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0.625rem;
+}
+
+.format-selector__btn {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--cv-radius-sm);
+  border: 1px solid var(--cv-border);
+  background: oklch(0.16 0.02 290 / 0.7);
+  color: var(--cv-text-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: center;
+  min-inline-size: auto;
+  min-block-size: auto;
+}
+
+.format-selector__btn:hover:not(.active) {
+  color: var(--cv-text);
+  border-color: oklch(0.40 0.04 290);
+}
+
+.format-selector__btn.active {
+  background: var(--cv-rose);
+  color: #fff;
+  border-color: var(--cv-rose);
+  box-shadow: 0 0 10px var(--cv-rose-glow);
+}
+
+.format-selector__desc {
+  font-size: 0.8rem;
+  color: var(--cv-text);
+  line-height: 1.5;
+  max-width: none;
+  margin-bottom: 0.375rem;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Phase 1.3 — Scroll-fix (body/html locked, pages scroll internally)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * .ai-labs is the <main> element on every page.
+ * Since html+body are now overflow:hidden / height:100%,
+ * each page must manage its own vertical scroll via overflow-y: auto.
+ *
+ * Mobile: full height minus fixed bottom nav
+ * Desktop: full height minus sticky top nav (nav is in flow so subtract its height)
+ */
+.ai-labs {
+  height: calc(100dvh - var(--nav-height-mobile, 60px) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .ai-labs {
+    height: calc(100dvh - var(--nav-height-desktop, 56px));
+    /* Desktop: sticky nav takes 56px from the flow, so this starts below it */
+    overflow-y: auto;
+  }
+}
+
+/* FormAI configure step: internally scrollable on small mobile screens */
+.formai-configure-unified {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Don't cut it; allow it to fill naturally */
+  max-height: calc(100dvh - var(--nav-height-mobile, 60px) - env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .formai-configure-unified {
+    max-height: calc(100dvh - var(--nav-height-desktop, 56px));
+    overflow-y: auto;
+  }
+}
+
+/* formai-coach section: fill its parent height properly */
+.formai-coach {
+  height: 100%;
+}
+.formai-coach__inner {
+  height: 100%;
+}
+
+
+/* ── Video buffer progress bar ────────────────────────────────────────────── */
+/*
+ * Appears at the bottom of the video panel when the user opens the Video tab
+ * before the background blob download has finished. Gives real-time feedback
+ * so the user knows the video is being pre-loaded for instant playback.
+ */
+.formai-video-buffer-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: oklch(0.10 0.02 290 / 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 0.5rem 1rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.formai-video-buffer-bar__fill {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--cv-rose) 0%, var(--cv-amber) 100%);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 6px var(--cv-rose-glow);
+}
+
+.formai-video-buffer-bar__label {
+  font-size: 0.72rem;
+  color: var(--cv-text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* Give the video panel position:relative so the bar can be absolutely positioned */
+.formai-results-video-panel {
+  position: relative;
 }

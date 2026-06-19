@@ -1,28 +1,26 @@
 /**
- * FormAICoach.jsx — FormAI Coach Component
- * ==========================================
- * Multi-step flow:
- *   1. Camera Setup Wizard + Liability Disclaimer (setup)
- *   2. Configure: Exercise selector (incl. Auto-Detect) + Camera Angle + Minimal Overlay (configure)
- *   3. Upload: File drop zone (upload)
- *   4. Processing / Live Progress View (processing)
- *   5. Results: Annotated video + Rep count + Confidence badge (results)
+ * FormAICoach.jsx — FormAI Coach Component (Phase 1)
+ * ====================================================
+ * 3-step flow:
+ *   1. Configure + Upload  [configure]
+ *   2. Centered Processing [processing]
+ *   3. Results: two tabs   [results]
+ *      Tab A — Dashboard (loads immediately, internally scrollable)
+ *      Tab B — Video (unlocks when canplaythrough fires on hidden preload)
  *
- * Features:
- *   - Feature 5: Auto-Detect exercise option → ExerciseClassifier on backend
- *   - Feature 7: Camera angle auto-detection → AdaptiveUI warnings via tooltips
- *   - Feature 8: Minimal Overlay Toggle → bypasses skeleton/ROM/badges in video
- *
- * Audio: FormAIAudioEngine fires synthesis pings on depth achievement.
- * Privacy: No biometric data reaches the UI — only rep_count, duration_sec,
- *          exercise_type metadata + the annotated video URL.
+ * On Device protocol silently routes to YOLO via onDeviceShim (Phase 1).
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, CheckCircle, AlertTriangle, Camera, Info, RotateCcw, Video, Download, ChevronLeft, Zap } from 'lucide-react';
+import {
+  Upload, AlertTriangle, Info, RotateCcw,
+  Video, Download, Zap,
+} from 'lucide-react';
 import { submitAnalysis } from '../../lib/cvApi';
 import { FormAIAudioEngine } from './FormAIAudioEngine';
 import { FormStatsDashboard } from './FormStatsDashboard';
+import { InfoPopover } from './InfoPopover';
+import { FeatureDisclosure } from './FeatureDisclosure';
 
 // ── Local storage helpers ─────────────────────────────────────────────────────
 function loadPref(key, defaultVal) {
@@ -34,243 +32,207 @@ function savePref(key, val) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const CAMERA_TIPS = [
-  { check: true,  text: 'At hip height (≈ 30–36 inches from floor)' },
-  { check: true,  text: '6–8 feet away from you' },
-  { check: true,  text: 'Perpendicular to your movement plane (side view)' },
-  { check: false, text: 'NOT on the floor angled upward' },
-  { check: false, text: 'NOT behind you — front or side view only' },
-];
-
 const EXERCISES = [
-  { id: 'auto',      label: 'Auto-Detect', icon: '🤖', description: 'AI detects your exercise automatically' },
-  { id: 'squat',     label: 'Squat',       icon: '🏋️', description: 'Knee flexion (hip → knee → ankle)' },
-  { id: 'deadlift',  label: 'Deadlift',    icon: '💪', description: 'Hip hinge (shoulder → hip → knee)' },
-  { id: 'hip_thrust',label: 'Hip Thrust',  icon: '🔥', description: 'Hip extension (shoulder → hip → knee)' },
+  { id: 'squat',      label: 'Squat'       },
+  { id: 'deadlift',   label: 'Deadlift'    },
+  { id: 'hip_thrust', label: 'Hip Thrust'  },
+  { id: 'auto',       label: 'Auto-Detect' },
 ];
 
 const CAMERA_ANGLES = [
-  { id: 'auto',  label: 'Auto' },
-  { id: 'side',  label: 'Side' },
+  { id: 'auto',  label: 'Auto'  },
+  { id: 'side',  label: 'Side'  },
   { id: 'front', label: 'Front' },
-  { id: '45deg', label: '45°' },
+  { id: '45deg', label: '45°'   },
 ];
 
 const CAMERA_ANGLE_GUIDANCE = {
-  side:  '📐 Film from the side for best accuracy on all exercises.',
-  front: '📐 Film from the front — note: depth & hinge angles are less accurate from this view.',
-  '45deg': '📐 Film at a 45° angle — moderate accuracy for most exercises.',
-  auto:  '📐 Auto-detecting your camera angle — filming from the side gives the best results.',
+  side:    '📐 Side view gives best accuracy for all exercises.',
+  front:   '📐 Front view — depth & hinge angles are less accurate.',
+  '45deg': '📐 45° angle — moderate accuracy for most exercises.',
+  auto:    '📐 Auto-detecting camera angle — side view is best.',
 };
 
-// ── Step 1: Camera Setup + Terms ─────────────────────────────────────────────
-function CameraSetupAndTermsStep({ onAccept }) {
-  const [agreed, setAgreed] = useState(false);
+const PROTOCOLS = [
+  { id: 'opencv',    label: 'DNN'       },
+  { id: 'yolo',      label: 'YOLO'      },
+  { id: 'on-device', label: 'On Device' },
+];
+
+// ── Step: Configure + Upload ──────────────────────────────────────────────────
+function ConfigureAndUploadStep({
+  exercise, setExercise,
+  cameraAngle, setCameraAngle,
+  overlayMode, setOverlayMode,
+  protocol, setProtocol,
+  onSubmit, isLoading,
+  error,
+}) {
+  const [file, setFile] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [showDisclosure, setShowDisclosure] = useState(false);
+  const [disclosureDismissed, setDisclosureDismissed] = useState(false);
+  const fileRef = useRef(null);
+
+  const outputFormat = loadPref('formai_output_format', 'webm');
+  const isOnDevice = protocol === 'on-device';
+
+  const handleProtocolChange = useCallback((id) => {
+    if (id === 'on-device' && exercise === 'auto') {
+      setExercise('squat');
+    }
+    setProtocol(id);
+    if (id === 'on-device') {
+      setDisclosureDismissed(false);
+      setShowDisclosure(true);
+    } else {
+      setShowDisclosure(false);
+    }
+  }, [setProtocol, exercise, setExercise]);
+
+  const handleDrop = useCallback(e => {
+    e.preventDefault();
+    setDragOver(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped && (dropped.type.startsWith('video/') || dropped.type === '')) {
+      setFile(dropped);
+    }
+  }, []);
+
+  const guidanceText = CAMERA_ANGLE_GUIDANCE[cameraAngle] || CAMERA_ANGLE_GUIDANCE.auto;
+
   return (
-    <div className="formai-step formai-setup-terms">
-      {/* Camera Setup — top & colourful */}
-      <div className="formai-setup-terms__camera">
-        <div className="formai-camera-setup__header">
-          <Camera size={24} className="color-icon" />
-          <h2 className="color-title">Camera Setup Guide</h2>
+    <div className="formai-step formai-configure-unified">
+      <h2 className="formai-configure__heading">Configure Your Analysis</h2>
+
+      {/* Error banner */}
+      {error && (
+        <div className="formai-error-banner" role="alert">
+          <AlertTriangle size={16} />
+          <span>{error}</span>
         </div>
-        <p className="formai-camera-setup__subtitle">
-          For accurate analysis, position your phone or camera:
-        </p>
-        <ul className="formai-camera-tips" role="list">
-          {CAMERA_TIPS.map((tip, i) => (
-            <li key={i} className={`formai-camera-tip ${tip.check ? 'tip--good' : 'tip--bad'}`}>
-              <span className="tip__icon">{tip.check ? '✅' : '❌'}</span>
-              <span>{tip.text}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="formai-camera-setup__angles">
-          <h3>Ideal view for each exercise:</h3>
-          <ul>
-            <li>🦵 Squat → Side view (sagittal plane)</li>
-            <li>🏋️ Deadlift → Side view (sagittal plane)</li>
-            <li>🔥 Hip Thrust → Side view (sagittal plane)</li>
-          </ul>
+      )}
+
+      {/* ── Exercise Type ── */}
+      <div className="formai-configure__section">
+        <div className="formai-configure__label-row">
+          <span className="formai-configure__section-label">Exercise Type</span>
+          <InfoPopover id="info-exercise">
+            <p>Select your exercise so the AI can focus on the correct joint angles. Auto-Detect works well but requires a server-side classifier — not available in On Device mode.</p>
+          </InfoPopover>
         </div>
-      </div>
-
-      {/* Divider */}
-      <div className="formai-setup-terms__divider" />
-
-      {/* Liability Terms — below & nonchalant */}
-      <div className="formai-setup-terms__liability">
-        <h3 className="formai-liability__title">Liability Disclaimer</h3>
-        <p className="formai-liability__text-nonchalant">
-          FormAI Coach is an educational tool that provides general movement observations. It is not a substitute for professional coaching, medical advice, physical therapy, or rehabilitation. Angle measurements are estimates only; lighting, camera positioning, and body proportions affect accuracy. Cues are general observations and do not replace personalized instructions from your trainer. Stop immediately if you feel pain or discomfort. Heather Holly Body, LLC is not liable for injuries or adverse outcomes resulting from exercise performed while using this tool.
-        </p>
-      </div>
-
-      {/* Single Checkbox */}
-      <label className="formai-checkbox-label">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={e => setAgreed(e.target.checked)}
-          id="formai-setup-agree"
-          className="formai-checkbox"
-        />
-        <span>I have set up my camera and agree to the terms.</span>
-      </label>
-
-      {/* Continue button */}
-      <button
-        id="formai-setup-btn"
-        className="btn btn--primary btn--full"
-        disabled={!agreed}
-        onClick={onAccept}
-      >
-        Accept &amp; Continue →
-      </button>
-    </div>
-  );
-}
-
-// ── Step 2: Configure (Feature 5, 7, 8) ──────────────────────────────────────
-function ConfigureStep({ exercise, setExercise, cameraAngle, setCameraAngle, overlayMode, setOverlayMode, onNext }) {
-  return (
-    <div className="formai-step formai-configure">
-      <h2>Configure Your Analysis</h2>
-
-      {/* Exercise selector (4 options incl. Auto-Detect) */}
-      <div>
-        <p className="formai-configure__section-label">Exercise Type</p>
-        <div className="formai-exercise-grid" role="radiogroup" aria-label="Select exercise">
-          {EXERCISES.map(ex => (
-            <button
-              key={ex.id}
-              id={`formai-exercise-${ex.id}`}
-              role="radio"
-              aria-checked={exercise === ex.id}
-              className={`formai-exercise-btn ${exercise === ex.id ? 'active' : ''} ${ex.id === 'auto' ? 'formai-exercise-btn--auto' : ''}`}
-              onClick={() => setExercise(ex.id)}
-            >
-              <span className="formai-exercise-btn__icon">{ex.icon}</span>
-              <span className="formai-exercise-btn__label">{ex.label}</span>
-              <span className="formai-exercise-btn__desc">{ex.description}</span>
-            </button>
-          ))}
+        <div className="formai-segmented" role="radiogroup" aria-label="Select exercise">
+          {EXERCISES.map(ex => {
+            const isDisabled = isOnDevice && ex.id === 'auto';
+            return (
+              <button
+                key={ex.id}
+                id={`formai-exercise-${ex.id}`}
+                type="button"
+                role="radio"
+                aria-checked={exercise === ex.id}
+                aria-disabled={isDisabled}
+                className={`formai-segmented__btn ${exercise === ex.id ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                onClick={() => !isDisabled && setExercise(ex.id)}
+                title={isDisabled ? 'Auto-Detect is not available in On Device mode' : undefined}
+              >
+                {ex.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Camera angle selector (Feature 7) */}
-      <div>
-        <p className="formai-configure__section-label">
-          Camera Angle
-          <span className="formai-configure__section-hint"> — helps optimise angle accuracy</span>
-        </p>
-        <div className="formai-camera-angle-selector" role="radiogroup" aria-label="Select camera angle">
+      {/* ── Camera Angle ── */}
+      <div className="formai-configure__section">
+        <div className="formai-configure__label-row">
+          <span className="formai-configure__section-label">Camera Angle</span>
+          <InfoPopover id="info-camera-angle">
+            <p>Helps optimise angle accuracy. Side view gives the best results for all exercises. If unsure, leave on Auto.</p>
+          </InfoPopover>
+        </div>
+        <div className="formai-segmented" role="radiogroup" aria-label="Select camera angle">
           {CAMERA_ANGLES.map(ang => (
             <button
               key={ang.id}
               id={`formai-angle-${ang.id}`}
+              type="button"
               role="radio"
               aria-checked={cameraAngle === ang.id}
-              className={`formai-camera-angle-btn ${cameraAngle === ang.id ? 'active' : ''}`}
+              className={`formai-segmented__btn ${cameraAngle === ang.id ? 'active' : ''}`}
               onClick={() => setCameraAngle(ang.id)}
             >
               {ang.label}
             </button>
           ))}
         </div>
+        <p className="formai-configure__guidance">{guidanceText}</p>
       </div>
 
-      {/* Minimal overlay toggle (Feature 8) */}
-      <div className="formai-overlay-toggle-row">
-        <div className="formai-overlay-toggle-info">
-          <span className="formai-overlay-toggle-info__title">Minimal Overlay</span>
-          <span className="formai-overlay-toggle-info__desc">
-            Hides the neon skeleton &amp; ROM gauges — keeps rep counter only
-          </span>
+      {/* ── Protocol ── */}
+      <div className="formai-configure__section">
+        <div className="formai-configure__label-row">
+          <span className="formai-configure__section-label">Processing</span>
+          <InfoPopover id="info-protocol">
+            <p><strong>DNN</strong> — OpenCV-based, fastest, good for well-lit videos.<br /><strong>YOLO</strong> — Best accuracy, recommended for most users.<br /><strong>On Device</strong> — Routes privately through YOLO in Phase 1; full local inference in Phase 2.</p>
+          </InfoPopover>
         </div>
-        <label className="formai-toggle" htmlFor="formai-overlay-toggle" aria-label="Toggle minimal overlay mode">
-          <input
-            id="formai-overlay-toggle"
-            type="checkbox"
-            className="formai-toggle__input"
-            checked={overlayMode === 'minimal'}
-            onChange={e => setOverlayMode(e.target.checked ? 'minimal' : 'full')}
-          />
-          <span className="formai-toggle__track">
-            <span className="formai-toggle__thumb" />
-          </span>
-        </label>
-      </div>
-
-      <button
-        id="formai-configure-next-btn"
-        className="btn btn--primary btn--full"
-        onClick={onNext}
-      >
-        Next: Upload Video →
-      </button>
-
-      <p className="formai-disclaimer-footer">
-        <Info size={12} /> Settings are saved automatically for your next session.
-      </p>
-    </div>
-  );
-}
-
-// ── Step 3: Upload ────────────────────────────────────────────────────────────
-function UploadStep({ onSubmit, onBack, isLoading, cameraAngle, exercise, protocol, setProtocol }) {
-  const [file, setFile] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef(null);
-
-  const handleDrop = useCallback(e => {
-    e.preventDefault();
-    setDragOver(false);
-    const dropped = e.dataTransfer.files[0];
-    // iOS Safari can report an empty MIME type for .mov files from the Photos Library;
-    // accept any file whose type starts with 'video/' OR has no type (iOS .mov fallback).
-    if (dropped && (dropped.type.startsWith('video/') || dropped.type === '')) setFile(dropped);
-  }, []);
-
-  const guidanceText = CAMERA_ANGLE_GUIDANCE[cameraAngle] || CAMERA_ANGLE_GUIDANCE.auto;
-
-  return (
-    <div className="formai-step formai-upload">
-      <div className="formai-upload__header-row">
-        <button
-          id="formai-back-btn"
-          className="btn btn--ghost formai-upload__back-btn"
-          onClick={onBack}
-          aria-label="Back to settings"
-        >
-          <ChevronLeft size={16} /> Back to settings
-        </button>
-        <h2>Upload Video</h2>
-      </div>
-
-      {/* Dynamic guidance banner based on selected camera angle */}
-      <div className="formai-upload-guidance-banner" role="note" aria-label="Camera guidance">
-        {guidanceText}
-      </div>
-
-      {/* Protocol toggle — OpenCV DNN vs YOLO */}
-      <div className="protocol-toggle" role="radiogroup" aria-label="Inference protocol">
-        <div className="protocol-toggle__pills">
-          {[{ id: 'opencv', label: 'OpenCV DNN' }, { id: 'yolo', label: 'YOLO' }].map(opt => (
+        <div className="formai-segmented" role="radiogroup" aria-label="Processing protocol">
+          {PROTOCOLS.map(opt => (
             <button
               key={opt.id}
+              id={`formai-protocol-${opt.id}`}
               type="button"
               role="radio"
               aria-checked={protocol === opt.id}
-              className={`protocol-pill ${protocol === opt.id ? 'protocol-pill--active' : ''}`}
-              onClick={() => setProtocol(opt.id)}
+              className={`formai-segmented__btn ${protocol === opt.id ? 'active' : ''} ${opt.id === 'on-device' ? 'formai-segmented__btn--on-device' : ''}`}
+              onClick={() => handleProtocolChange(opt.id)}
             >
               {opt.label}
             </button>
           ))}
         </div>
+
+        {/* Privacy badge */}
+        <div className={`formai-privacy-badge ${isOnDevice ? 'formai-privacy-badge--on-device' : 'formai-privacy-badge--server'}`}>
+          {isOnDevice
+            ? '🔒 Your video never leaves this device'
+            : '☁️ Video is uploaded securely for processing'}
+        </div>
       </div>
 
+      {/* ── Feature Disclosure ── */}
+      <FeatureDisclosure
+        show={showDisclosure && !disclosureDismissed}
+        outputFormat={outputFormat}
+        onDismiss={() => setDisclosureDismissed(true)}
+      />
+
+      {/* ── Minimal Overlay ── */}
+      <div className="formai-configure__section">
+        <div className="formai-overlay-toggle-row">
+          <div className="formai-overlay-toggle-info">
+            <span className="formai-overlay-toggle-info__title">Minimal Overlay</span>
+            <span className="formai-overlay-toggle-info__desc">
+              Hides the neon skeleton &amp; ROM gauges — keeps rep counter only
+            </span>
+          </div>
+          <label className="formai-toggle" htmlFor="formai-overlay-toggle" aria-label="Toggle minimal overlay mode">
+            <input
+              id="formai-overlay-toggle"
+              type="checkbox"
+              className="formai-toggle__input"
+              checked={overlayMode === 'minimal'}
+              onChange={e => setOverlayMode(e.target.checked ? 'minimal' : 'full')}
+            />
+            <span className="formai-toggle__track">
+              <span className="formai-toggle__thumb" />
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* ── Upload Zone ── */}
       <div
         className={`formai-drop-zone ${dragOver ? 'drag-over' : ''} ${file ? 'has-file' : ''}`}
         onDrop={handleDrop}
@@ -283,8 +245,6 @@ function UploadStep({ onSubmit, onBack, isLoading, cameraAngle, exercise, protoc
         onKeyDown={e => e.key === 'Enter' && fileRef.current?.click()}
         id="formai-drop-zone"
       >
-        {/* iOS: accept="video/*" opens the Photos Library on iPhone;
-         omitting the `capture` attribute prevents locking to the live camera. */}
         <input
           ref={fileRef}
           type="file"
@@ -295,22 +255,23 @@ function UploadStep({ onSubmit, onBack, isLoading, cameraAngle, exercise, protoc
         />
         {file ? (
           <>
-            <Video size={32} className="drop-zone__icon drop-zone__icon--success" />
+            <Video size={28} className="drop-zone__icon drop-zone__icon--success" />
             <p className="drop-zone__filename">{file.name}</p>
             <p className="drop-zone__size">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
           </>
         ) : (
           <>
-            <Upload size={32} className="drop-zone__icon" />
-            <p className="drop-zone__label">Drop your video here or click to browse</p>
+            <Upload size={28} className="drop-zone__icon" />
+            <p className="drop-zone__label">Drop your video here or tap to browse</p>
             <p className="drop-zone__hint">MP4, MOV, up to 100 MB</p>
           </>
         )}
       </div>
 
+      {/* ── CTA ── */}
       <button
         id="formai-analyze-btn"
-        className="btn btn--primary btn--full"
+        className="btn btn--primary btn--full formai-configure__cta"
         onClick={() => file && onSubmit(file, exercise)}
         disabled={!file || isLoading}
       >
@@ -318,242 +279,369 @@ function UploadStep({ onSubmit, onBack, isLoading, cameraAngle, exercise, protoc
       </button>
 
       <p className="formai-disclaimer-footer">
-        <Info size={12} /> This is an AI-generated estimate for educational purposes only. Always consult your trainer.
+        <Info size={12} /> AI-generated estimate for educational purposes only. Always consult your trainer.
       </p>
     </div>
   );
 }
 
-// ── Step 4: Processing ────────────────────────────────────────────────────────
-function ProcessingStep({ progress }) {
-  const phases = {
-    queued: { label: 'In Queue', pct: 15 },
-    processing: { label: 'Analyzing…', pct: 65 },
-  };
-  const current = phases[progress?.phase] || phases.queued;
+// ── Step: Processing (dead-centered) ─────────────────────────────────────────
+function ProcessingStep({ progress, protocol }) {
+  const isOnDevice = protocol === 'on-device';
+
+  // Compute progress bar percentage
+  let pct;
+  if (progress?.phase === 'processing' && progress.totalFrames) {
+    pct = Math.round((progress.framesProcessed / progress.totalFrames) * 80) + 10;
+  } else if (progress?.phase === 'loading_model') {
+    pct = 8;
+  } else if (progress?.phase === 'queued') {
+    pct = 15;
+  } else {
+    pct = isOnDevice ? 8 : 15;
+  }
+
+  const label = progress?.phase === 'loading_model'
+    ? 'Loading AI model…'
+    : progress?.phase === 'processing'
+    ? 'Analyzing…'
+    : 'In Queue…';
 
   return (
-    <div className="formai-step formai-processing">
+    <div className="formai-processing-centered" role="status" aria-live="polite">
       <div className="formai-processing__spinner" aria-label="Processing" />
-      <h2 className="formai-processing__label">{current.label}</h2>
+      <h2 className="formai-processing__label">{label}</h2>
+      {/* Queue position (server path) */}
       {progress?.position > 0 && (
         <p className="formai-processing__queue">
           Position in queue: <strong>{progress.position}</strong>
           {progress.estimatedWait && ` · ~${progress.estimatedWait}s wait`}
         </p>
       )}
-      <div className="formai-progress-bar" role="progressbar" aria-valuenow={current.pct} aria-valuemin={0} aria-valuemax={100}>
-        <div className="formai-progress-bar__fill" style={{ width: `${current.pct}%` }} />
+      {/* Frame-by-frame progress (on-device path) */}
+      {progress?.phase === 'loading_model' && (
+        <p className="formai-processing__frames">Loading AI model into browser…</p>
+      )}
+      {progress?.phase === 'processing' && progress.totalFrames && (
+        <p className="formai-processing__frames">
+          Frame {progress.framesProcessed} / {progress.totalFrames}
+          {progress.device && (
+            <span className="formai-processing__device-badge">
+              {progress.device === 'webgpu' ? '⚡ WebGPU' : '🔧 WASM'}
+            </span>
+          )}
+        </p>
+      )}
+      {progress?.device === 'wasm' && progress?.phase === 'processing' && (
+        <p className="formai-processing__fallback-note">
+          WebGPU not available — using WASM (may be slower)
+        </p>
+      )}
+      <div
+        className="formai-progress-bar"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div className="formai-progress-bar__fill" style={{ width: `${pct}%` }} />
       </div>
       <p className="formai-processing__privacy-note">
-        🔒 Your video is processed securely. Angle measurements exist only in memory and are never stored.
+        {isOnDevice
+          ? '🔒 Processing entirely on your device — video never leaves your browser.'
+          : '🔒 Your video is processed securely and never stored.'}
       </p>
     </div>
   );
 }
 
-// ── Step 5: Results ───────────────────────────────────────────────────────────
+// ── Step: Results (two-tab layout) ───────────────────────────────────────────
 function ResultsStep({ result, onReset, getAudioEngine }) {
   const { signed_url, metadata, processing_log } = result;
   const {
-    rep_count, duration_sec, exercise_type, stats,
-    // Feature 5: auto-detection
-    detected_exercise_type, exercise_confidence,
-    // Feature 7: camera angle
+    rep_count, exercise_type, stats,
     camera_angle_warnings,
   } = metadata || {};
+
+  const [activeTab, setActiveTab]     = useState('dashboard');
+  // videoReady: true → Video tab is immediately clickable (may still be buffering)
+  const [videoReady, setVideoReady]   = useState(false);
+  // blobUrl: set once full video is buffered into memory → instant zero-lag playback
+  const [blobUrl, setBlobUrl]         = useState(null);
+  // 0–100 during background download, -1 once blob is ready
+  const [bufferPct, setBufferPct]     = useState(0);
+  const blobRef                       = useRef(null); // to revoke on unmount
   const [isDownloading, setIsDownloading] = useState(false);
+  const isOnDevice = processing_log?.on_device === true;
 
-  const handleDownload = async (e) => {
-    e.preventDefault();
-    if (!signed_url || isDownloading) return;
+  // Audio ping on results
+  useEffect(() => {
+    if (rep_count > 0) {
+      const audioEngine = getAudioEngine?.();
+      if (audioEngine) { audioEngine.resume(); audioEngine.playDepthAchievedPing(); }
+    }
+  }, [rep_count, getAudioEngine]);
 
+  /**
+   * Background video prefetch — streams the signed_url into a Blob while the
+   * user reads the Dashboard tab. Once complete the video element switches to
+   * the blob URL so playback starts instantly with no network buffering.
+   *
+   * • Tab is made clickable immediately (falls back to signed_url for direct streaming
+   *   if the user clicks before the blob is ready).
+   * • Files > MAX_BLOB_MB skip the blob path to avoid OOM on mobile — the
+   *   signed_url is used directly (browser streams on demand).
+   * • Blob is revoked on unmount to release memory.
+   */
+  useEffect(() => {
+    const MAX_BLOB_MB = 150; // skip blob approach above this threshold
+
+    if (!signed_url) {
+      setVideoReady(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    // Unlock the tab immediately so the user isn't blocked
+    setVideoReady(true);
+    setBufferPct(1); // show that something is happening
+
+    (async () => {
+      try {
+        const response = await fetch(signed_url, { mode: 'cors' });
+        if (!response.ok || !response.body) return;
+
+        const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
+
+        // Skip blob for very large files
+        if (contentLength > MAX_BLOB_MB * 1024 * 1024) {
+          if (!cancelled) setBufferPct(100);
+          return;
+        }
+
+        // Detect MIME from URL or Content-Type header
+        const mime =
+          response.headers.get('Content-Type') ||
+          (signed_url.includes('.webm') ? 'video/webm' : 'video/mp4');
+
+        const reader = response.body.getReader();
+        const chunks = [];
+        let received = 0;
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          if (cancelled) { reader.cancel(); break; }
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.byteLength;
+          if (contentLength > 0 && !cancelled) {
+            setBufferPct(Math.min(99, Math.round((received / contentLength) * 100)));
+          }
+        }
+
+        if (!cancelled && chunks.length > 0) {
+          const blob = new Blob(chunks, { type: mime });
+          const url  = URL.createObjectURL(blob);
+          blobRef.current = url;
+          setBlobUrl(url);
+          setBufferPct(100);
+        }
+      } catch {
+        // Network or CORS error — video plays directly from signed_url (browser streams it)
+        if (!cancelled) setBufferPct(100);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (blobRef.current) {
+        URL.revokeObjectURL(blobRef.current);
+        blobRef.current = null;
+      }
+    };
+  }, [signed_url]);
+
+  const handleDownload = async () => {
+    if (isDownloading) return;
     setIsDownloading(true);
+    // Determine file extension based on output source
+    const ext = processing_log?.on_device
+      ? (localStorage.getItem('formai_output_format') === 'mp4' ? '.mp4' : '.webm')
+      : '.mp4';
     try {
+      // If we already have the blob in memory, reuse it — no second download needed
+      if (blobRef.current) {
+        const link = document.createElement('a');
+        link.href = blobRef.current;
+        link.download = `formai-${exercise_type || 'workout'}${ext}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+      if (!signed_url) return;
       const response = await fetch(signed_url);
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok) throw new Error('Download failed');
       const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
+      const tempUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `formai-${exercise_type || 'workout'}.mp4`;
+      link.href = tempUrl;
+      link.download = `formai-${exercise_type || 'workout'}${ext}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-    } catch (error) {
-      console.error('Download failed:', error);
+      setTimeout(() => URL.revokeObjectURL(tempUrl), 1000);
+    } catch (err) {
+      console.error('Download failed:', err);
       alert('Failed to download video. Please try again.');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  useEffect(() => {
-    if (rep_count > 0) {
-      const audioEngine = getAudioEngine?.();
-      if (audioEngine) {
-        audioEngine.resume();
-        audioEngine.playDepthAchievedPing();
-      }
-    }
-  }, [rep_count, getAudioEngine]);
-
-  // Feature 5: determine if we should show a confidence badge
-  const showDetectionBadge = detected_exercise_type && detected_exercise_type !== 'uncertain';
-  const detectedLabel = detected_exercise_type
-    ? detected_exercise_type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
-    : null;
-  const confidencePct = exercise_confidence != null ? Math.round(exercise_confidence * 100) : null;
-  const isLowConfidence = exercise_confidence != null && exercise_confidence < 0.70;
-
   return (
-    <div className="formai-step formai-results">
-      <div className="formai-results__header-row">
-        <div className="formai-results__header">
-          <CheckCircle size={28} className="formai-results__check" />
-          <h2>Analysis Complete</h2>
-        </div>
+    <div className="formai-results-v2">
+
+      {/* ── Tab strip ── */}
+      <div className="formai-results-tabs" role="tablist" aria-label="Analysis results">
         <button
-          id="formai-reset-btn"
-          className="btn btn--primary formai-results__reset-btn"
+          id="results-tab-dashboard"
+          role="tab"
+          aria-selected={activeTab === 'dashboard'}
+          aria-controls="results-panel-dashboard"
+          className={`formai-results-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          📊 Dashboard
+        </button>
+        <button
+          id="results-tab-video"
+          role="tab"
+          aria-selected={activeTab === 'video'}
+          aria-controls="results-panel-video"
+          className={`formai-results-tab ${activeTab === 'video' ? 'active' : ''}`}
+          onClick={() => setActiveTab('video')}
+          title="View annotated video"
+        >
+          {bufferPct >= 100 || blobUrl
+            ? '▶ Video'
+            : `▶ Video (↓${bufferPct}%)`
+          }
+        </button>
+      </div>
+
+
+      {/* ── Dashboard panel (internally scrollable) ── */}
+      <div
+        id="results-panel-dashboard"
+        role="tabpanel"
+        aria-labelledby="results-tab-dashboard"
+        className={`formai-results-panel ${activeTab !== 'dashboard' ? 'formai-panel--hidden' : ''}`}
+      >
+        {isOnDevice && (
+          <div className="formai-privacy-badge formai-privacy-badge--on-device" role="status">
+            🔒 Processed as On Device
+          </div>
+        )}
+
+        <FormStatsDashboard
+          stats={stats}
+          exerciseType={exercise_type}
+          processingLog={processing_log}
+          cameraAngleWarnings={camera_angle_warnings}
+        />
+
+        {/* Analyze Another — bottom of dashboard */}
+        <button
+          id="formai-analyze-another-bottom"
+          className="btn btn--primary btn--full"
           onClick={onReset}
         >
           <RotateCcw size={16} /> Analyze Another Video
         </button>
+
+        <p className="formai-disclaimer-footer">
+          <Info size={12} /> AI-generated estimate for educational purposes only. Always consult your trainer.
+        </p>
       </div>
 
-      {/* Feature 5: Auto-detection confidence badge */}
-      {showDetectionBadge && (
-        <div
-          className={`formai-detected-badge ${isLowConfidence ? 'formai-detected-badge--warn' : 'formai-detected-badge--ok'}`}
-          role="status"
-          aria-label={`Detected exercise: ${detectedLabel}, confidence ${confidencePct}%`}
-        >
-          <Zap size={14} />
-          <span>
-            Detected: <strong>{detectedLabel}</strong>
-            {confidencePct != null && <span className="formai-detected-badge__conf"> ({confidencePct}% confidence)</span>}
-          </span>
-        </div>
-      )}
-
-      {/* Feature 5: Low confidence warning */}
-      {isLowConfidence && (
-        <div className="formai-low-conf-banner" role="alert">
-          <AlertTriangle size={16} />
-          <span>
-            Auto-detection confidence is low ({confidencePct}%). For more accurate results,
-            select your exercise type manually in the Configure step.
-          </span>
-        </div>
-      )}
-
-      {/* Stats row */}
-      <div className="formai-stats-row">
-        <div className="formai-stat">
-          <span className="formai-stat__value">{rep_count ?? '—'}</span>
-          <span className="formai-stat__label">Reps Detected</span>
-        </div>
-        <div className="formai-stat">
-          <span className="formai-stat__value">{duration_sec ? `${duration_sec}s` : '—'}</span>
-          <span className="formai-stat__label">Duration</span>
-        </div>
-        <div className="formai-stat">
-          <span className="formai-stat__value">{exercise_type ? exercise_type.replace('_', ' ') : '—'}</span>
-          <span className="formai-stat__label">Exercise</span>
-        </div>
-      </div>
-
-      {/* Annotated video */}
-      {signed_url ? (
-        <div className="formai-video-container">
+      {/* ── Video panel ── */}
+      <div
+        id="results-panel-video"
+        role="tabpanel"
+        aria-labelledby="results-tab-video"
+        className={`formai-results-video-panel ${activeTab !== 'video' ? 'formai-panel--hidden' : ''}`}
+      >
+        {(blobUrl || signed_url) && (
           <video
             controls
-            preload="metadata"
-            className="formai-video"
-            src={signed_url}
+            autoPlay
+            className="formai-results-video-full"
+            src={blobUrl ?? signed_url}
             aria-label="Annotated workout analysis video"
           />
-        </div>
-      ) : (
-        <div className="formai-no-video">
-          <p>Video processing complete. Link will appear shortly.</p>
-        </div>
-      )}
+        )}
 
-      {/* Video actions */}
-      {signed_url && (
-        <div className="formai-video-actions">
+        {/* Buffer progress bar — shown while blob is being built (tab opened early) */}
+        {!blobUrl && bufferPct > 0 && bufferPct < 100 && activeTab === 'video' && (
+          <div className="formai-video-buffer-bar" role="progressbar"
+            aria-valuenow={bufferPct} aria-valuemin={0} aria-valuemax={100}
+            aria-label={`Buffering ${bufferPct}%`}
+          >
+            <div className="formai-video-buffer-bar__fill" style={{ width: `${bufferPct}%` }} />
+            <span className="formai-video-buffer-bar__label">
+              Pre-loading for instant playback… {bufferPct}%
+            </span>
+          </div>
+        )}
+
+        <div className="formai-results-video-actions">
           <button
             id="formai-download-btn"
-            className="btn btn--secondary formai-download-btn"
+            className="btn btn--secondary"
             onClick={handleDownload}
             disabled={isDownloading}
           >
             {isDownloading ? (
-              <>
-                <div className="formai-download-spinner" aria-hidden="true" />
-                <span>Downloading...</span>
-              </>
+              <><div className="formai-download-spinner" aria-hidden="true" /><span>Downloading…</span></>
             ) : (
-              <>
-                <Download size={16} />
-                <span>Download Analyzed Video</span>
-              </>
+              <><Download size={16} /><span>Download Video</span></>
             )}
           </button>
+          <button
+            id="formai-analyze-another-video"
+            className="btn btn--ghost"
+            onClick={onReset}
+          >
+            <RotateCcw size={16} /> Analyze Another
+          </button>
         </div>
-      )}
+      </div>
 
-      {/* Stats Dashboard — slides up after video (Feature 7: passes camera angle warnings) */}
-      <FormStatsDashboard
-        stats={stats}
-        exerciseType={exercise_type}
-        processingLog={processing_log}
-        cameraAngleWarnings={camera_angle_warnings}
-      />
-
-      {/* Processing audit (low-confidence camera elevation flag) */}
-      {processing_log?.avg_camera_elevation_deg > 20 && (
-        <div className="formai-low-conf-banner" role="alert">
-          <AlertTriangle size={16} />
-          <span>
-            ⚠ Camera angle detected at ~{Math.round(processing_log.avg_camera_elevation_deg)}°.
-            Results may be lower accuracy. Review the <a href="#camera-guide">Camera Setup Guide</a>.
-          </span>
-        </div>
-      )}
-
-      <p className="formai-disclaimer-footer">
-        <Info size={12} /> This is an AI-generated estimate for educational purposes only. Always consult your trainer.
-      </p>
     </div>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function FormAICoach() {
-  // Step flow: setup → configure → upload → processing → results
-  const [step, setStep] = useState('setup');
+  const [step, setStep]         = useState('configure');
   const [progress, setProgress] = useState(null);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [result, setResult]     = useState(null);
+  const [error, setError]       = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Feature 5/7/8: localStorage-persisted settings
-  const [exercise,    setExerciseRaw]    = useState(() => loadPref('hhb_exercise',    'squat'));
+  // Persisted settings
+  const [exercise,    setExerciseRaw]    = useState(() => loadPref('hhb_exercise',     'squat'));
   const [cameraAngle, setCameraAngleRaw] = useState(() => loadPref('hhb_camera_angle', 'auto'));
   const [overlayMode, setOverlayModeRaw] = useState(() => loadPref('hhb_overlay_mode', 'full'));
-  const [protocol, setProtocolRaw] = useState('opencv');
+  const [protocol,    setProtocolRaw]    = useState(() => loadPref('hhb_protocol',     'opencv'));
 
-  // Persist to localStorage on every change
-  const setExercise    = useCallback(v => { savePref('hhb_exercise',    v); setExerciseRaw(v);    }, []);
+  const setExercise    = useCallback(v => { savePref('hhb_exercise',     v); setExerciseRaw(v);    }, []);
   const setCameraAngle = useCallback(v => { savePref('hhb_camera_angle', v); setCameraAngleRaw(v); }, []);
   const setOverlayMode = useCallback(v => { savePref('hhb_overlay_mode', v); setOverlayModeRaw(v); }, []);
-  const setProtocol    = useCallback(v => { setProtocolRaw(v); }, []);
+  const setProtocol    = useCallback(v => { savePref('hhb_protocol',     v); setProtocolRaw(v);   }, []);
 
   const audioEngineRef = useRef(null);
 
@@ -562,44 +650,46 @@ export function FormAICoach() {
     return () => audioEngineRef.current?.destroy();
   }, []);
 
-  useEffect(() => {
-    if (step === 'configure' || step === 'upload') {
-      const element = document.getElementById('ai-labs-panel-form-ai');
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }
-  }, [step]);
-
   const handleSubmit = useCallback(async (file, exerciseType) => {
     setIsLoading(true);
     setError(null);
     setStep('processing');
 
-    // Generate a minimal consent token for this session
     const consentToken = crypto.randomUUID();
 
     try {
-      const res = await submitAnalysis(
-        file,
-        'form-ai',
-        {
-          exercise_type: exerciseType,
-          consent_token: consentToken,
-          overlay_mode: overlayMode,  // Feature 8
-          protocol,  // Dual protocol toggle
-        },
-        (prog) => setProgress(prog)
-      );
+      let res;
+      if (protocol === 'on-device') {
+        const { processVideoOnDevice } = await import('../../lib/inference/onDeviceInference.js');
+        res = await processVideoOnDevice(file, {
+          exerciseType,
+          overlayMode,
+          cameraAngle,
+          onProgress: (prog) => setProgress(prog),
+        });
+      } else {
+        res = await submitAnalysis(
+          file,
+          'form-ai',
+          {
+            exercise_type: exerciseType,
+            consent_token: consentToken,
+            overlay_mode: overlayMode,
+            protocol,
+            camera_angle: cameraAngle,
+          },
+          (prog) => setProgress(prog),
+        );
+      }
       setResult(res);
       setStep('results');
     } catch (err) {
       setError(err.message);
-      setStep('upload');
+      setStep('configure');
     } finally {
       setIsLoading(false);
     }
-  }, [overlayMode, protocol]);
+  }, [overlayMode, protocol, cameraAngle]);
 
   const handleReset = useCallback(() => {
     setStep('configure');
@@ -611,41 +701,23 @@ export function FormAICoach() {
   return (
     <section className="formai-coach" aria-label="FormAI Coach">
       <div className="formai-coach__inner">
-        {step === 'setup' && (
-          <CameraSetupAndTermsStep onAccept={() => setStep('configure')} />
-        )}
         {step === 'configure' && (
-          <ConfigureStep
+          <ConfigureAndUploadStep
             exercise={exercise}
             setExercise={setExercise}
             cameraAngle={cameraAngle}
             setCameraAngle={setCameraAngle}
             overlayMode={overlayMode}
             setOverlayMode={setOverlayMode}
-            onNext={() => setStep('upload')}
+            protocol={protocol}
+            setProtocol={setProtocol}
+            onSubmit={handleSubmit}
+            isLoading={isLoading}
+            error={error}
           />
         )}
-        {step === 'upload' && (
-          <>
-            {error && (
-              <div className="formai-error-banner" role="alert">
-                <AlertTriangle size={16} />
-                <span>{error}</span>
-              </div>
-            )}
-            <UploadStep
-              onSubmit={handleSubmit}
-              onBack={() => setStep('configure')}
-              isLoading={isLoading}
-              cameraAngle={cameraAngle}
-              exercise={exercise}
-              protocol={protocol}
-              setProtocol={setProtocol}
-            />
-          </>
-        )}
         {step === 'processing' && (
-          <ProcessingStep progress={progress} />
+          <ProcessingStep progress={progress} protocol={protocol} />
         )}
         {step === 'results' && result && (
           <ResultsStep

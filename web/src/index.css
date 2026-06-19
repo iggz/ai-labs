@@ -105,6 +105,10 @@
 
     /* Support light dark system */
     color-scheme: dark light;
+
+    /* Navigation height tokens */
+    --nav-height-mobile:  60px;
+    --nav-height-desktop: 56px;
   }
 
   /* --- Tier 2: Semantic Tokens (Adaptive) --- */
@@ -155,17 +159,29 @@
 
 /* ── Base Styles Layer ── */
 @layer base {
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     font-family: var(--font-body);
     font-size: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
     line-height: 1.65;
     background-color: var(--color-bg-primary);
     color: var(--color-text-secondary);
-    min-height: 100dvh;
-    overflow-x: hidden;
+    height: 100%;
+    overflow: hidden;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  #root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   h1, h2, h3, h4 {
