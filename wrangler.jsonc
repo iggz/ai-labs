@@ -2,12 +2,14 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ai-labs",
   "compatibility_date": "2026-06-19",
+  "main": "src/index.js",
   "observability": {
     "enabled": true
   },
   "assets": {
     "directory": "web/dist",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS"
   },
   "compatibility_flags": [
     "nodejs_compat"
