@@ -485,10 +485,8 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
   const handleDownload = async () => {
     if (isDownloading) return;
     setIsDownloading(true);
-    // Determine file extension based on output source
-    const ext = processing_log?.on_device
-      ? (localStorage.getItem('formai_output_format') === 'mp4' ? '.mp4' : '.webm')
-      : '.mp4';
+    const fmt = processing_log?.output_format;
+    const ext = fmt === 'mp4' ? '.mp4' : fmt === 'webm' ? '.webm' : '.mp4';
     try {
       // If we already have the blob in memory, reuse it — no second download needed
       if (blobRef.current) {
@@ -507,7 +505,7 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
       const tempUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = tempUrl;
-      link.download = `formai-${exercise_type || 'workout'}${ext}`;
+      link.download = `formai-${exercise_type || 'workout'}.${processing_log?.output_format || 'mp4'}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -523,7 +521,7 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
   return (
     <div className="formai-results-v2">
 
-      {/* ── Tab strip ── */}
+      {/* ── Tab strip — only show Video tab when a video was produced ── */}
       <div className="formai-results-tabs" role="tablist" aria-label="Analysis results">
         <button
           id="results-tab-dashboard"
@@ -535,20 +533,22 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
         >
           📊 Dashboard
         </button>
-        <button
-          id="results-tab-video"
-          role="tab"
-          aria-selected={activeTab === 'video'}
-          aria-controls="results-panel-video"
-          className={`formai-results-tab ${activeTab === 'video' ? 'active' : ''}`}
-          onClick={() => setActiveTab('video')}
-          title="View annotated video"
-        >
-          {bufferPct >= 100 || blobUrl
-            ? '▶ Video'
-            : `▶ Video (↓${bufferPct}%)`
-          }
-        </button>
+        {signed_url && (
+          <button
+            id="results-tab-video"
+            role="tab"
+            aria-selected={activeTab === 'video'}
+            aria-controls="results-panel-video"
+            className={`formai-results-tab ${activeTab === 'video' ? 'active' : ''}`}
+            onClick={() => setActiveTab('video')}
+            title="View annotated video"
+          >
+            {bufferPct >= 100 || blobUrl
+              ? '▶ Video'
+              : `▶ Video (↓${bufferPct}%)`
+            }
+          </button>
+        )}
       </div>
 
 
@@ -561,7 +561,10 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
       >
         {isOnDevice && (
           <div className="formai-privacy-badge formai-privacy-badge--on-device" role="status">
-            🔒 Processed as On Device
+            🔒 Processed entirely on your device
+            {!signed_url && (
+              <span className="formai-badge-note"> · Video export not available in this browser</span>
+            )}
           </div>
         )}
 
