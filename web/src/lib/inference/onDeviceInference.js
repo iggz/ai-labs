@@ -53,6 +53,9 @@ async function createVideoEncoder(onChunk, w, h) {
     framerate: OUT_FPS,
   };
 
+  // Expose a mutable flag so the caller can detect mid-loop encoder errors
+  const state = { closed: false };
+
   return new Promise((resolve) => {
     let settled = false;
     const settle = (result) => { if (!settled) { settled = true; resolve(result); } };
@@ -61,7 +64,8 @@ async function createVideoEncoder(onChunk, w, h) {
       output: onChunk,
       error: (e) => {
         console.error('[onDevice] VideoEncoder error:', e);
-        settle(null);  // encoder failed — caller falls back to MediaRecorder
+        state.closed = true;  // mark for mid-loop detection
+        settle(null);         // no-op if already settled (mid-loop error)
       },
     });
 
@@ -75,7 +79,9 @@ async function createVideoEncoder(onChunk, w, h) {
 
     // configure() is synchronous in spec but implementations may error async.
     // Yield one microtask so any synchronous error callback fires before we resolve.
-    Promise.resolve().then(() => settle({ encoder: enc, config: encConfig, dims: { ew, eh } }));
+    Promise.resolve().then(() =>
+      settle({ encoder: enc, config: encConfig, dims: { ew, eh }, state })
+    );
   });
 }
 
@@ -151,6 +157,7 @@ export async function processVideoOnDevice(file, {
   let muxer        = null;
   let muxerTarget  = null;
   let videoEncoder = null;
+  let encState     = null;  // shared state object from createVideoEncoder
   let encDims      = { ew: w, eh: h };  // may differ from w/h if dimensions were odd
   let recorder     = null;
   const recordedChunks = [];
@@ -170,6 +177,7 @@ export async function processVideoOnDevice(file, {
     // VideoEncoder is working — set up mp4-muxer
     outputFormat = 'mp4';
     videoEncoder = encResult.encoder;
+    encState     = encResult.state;
     encDims      = encResult.dims;
     outCanvas.width  = encDims.ew;
     outCanvas.height = encDims.eh;
@@ -265,16 +273,24 @@ export async function processVideoOnDevice(file, {
     }
 
     // ── Encode ────────────────────────────────────────────────────────────
-    if (videoEncoder && videoEncoder.state === 'configured') {
-      try {
-        const vf = new VideoFrame(outCanvas, {
-          timestamp: Math.round(encodedFrames * (1_000_000 / OUT_FPS)),
-          duration:  Math.round(1_000_000 / OUT_FPS),
-        });
-        videoEncoder.encode(vf, { keyFrame: encodedFrames % (OUT_FPS * 2) === 0 });
-        vf.close();
-      } catch (e) {
-        console.warn('[onDevice] VideoFrame/encode error:', e);
+    if (videoEncoder && videoEncoder.state === 'configured' && !encState?.closed) {
+      // Backpressure: if the encoder queue is building up, yield until it drains.
+      // Without this the encoder overflows on mobile and auto-closes itself.
+      if (videoEncoder.encodeQueueSize > 5) {
+        await new Promise(resolve => setTimeout(resolve, videoEncoder.encodeQueueSize * 10));
+      }
+      if (videoEncoder.state === 'configured' && !encState?.closed) {
+        try {
+          const vf = new VideoFrame(outCanvas, {
+            timestamp: Math.round(encodedFrames * (1_000_000 / OUT_FPS)),
+            duration:  Math.round(1_000_000 / OUT_FPS),
+          });
+          videoEncoder.encode(vf, { keyFrame: encodedFrames % (OUT_FPS * 2) === 0 });
+          vf.close();
+        } catch (e) {
+          console.warn('[onDevice] VideoFrame/encode error:', e);
+          if (encState) encState.closed = true;
+        }
       }
     }
     // MediaRecorder path: captureStream records automatically
@@ -300,17 +316,26 @@ export async function processVideoOnDevice(file, {
   let signedUrl = null;
 
   if (outputFormat === 'mp4' && videoEncoder && muxer) {
+    // Only flush if encoder is still alive — it may have self-closed on error
     if (videoEncoder.state === 'configured') {
-      try {
-        await videoEncoder.flush();
-      } catch (e) {
+      try { await videoEncoder.flush(); } catch (e) {
         console.warn('[onDevice] flush error:', e);
       }
     }
-    videoEncoder.close();
+    // close() throws if state is already 'closed' — guard explicitly
+    if (videoEncoder.state !== 'closed') {
+      try { videoEncoder.close(); } catch (e) {
+        console.warn('[onDevice] close error:', e);
+      }
+    }
     muxer.finalize();
     const blob = new Blob([muxerTarget.buffer], { type: 'video/mp4' });
-    signedUrl  = URL.createObjectURL(blob);
+    // Only produce a video URL if we encoded at least one frame successfully
+    if (blob.size > 1024) {
+      signedUrl = URL.createObjectURL(blob);
+    } else {
+      console.warn('[onDevice] MP4 output empty — video encoding failed silently');
+    }
 
   } else if (outputFormat === 'webm' && recorder) {
     recorder.stop();
