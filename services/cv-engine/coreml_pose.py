@@ -173,13 +173,15 @@ class CoreMLPoseModel:
         """
         self.conf_threshold = conf_threshold
 
-        # Pre-process
+        # Pre-process BGR -> RGB -> PIL Image
         letterboxed, scale, pad = self._letterbox(frame)
-        input_tensor = self._preprocess(letterboxed)
+        img_rgb = cv2.cvtColor(letterboxed, cv2.COLOR_BGR2RGB)
+        from PIL import Image
+        pil_img = Image.fromarray(img_rgb)
 
         # Run CoreML inference (ANE dispatch is internal to the runtime)
         t_infer = time.perf_counter()
-        preds   = self.model.predict({self._input_name: input_tensor})
+        preds   = self.model.predict({self._input_name: pil_img})
         self._last_predict_ms = (time.perf_counter() - t_infer) * 1000.0
 
         # Extract the raw output array
