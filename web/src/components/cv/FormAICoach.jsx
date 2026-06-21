@@ -57,6 +57,7 @@ const CAMERA_ANGLE_GUIDANCE = {
 
 const PROTOCOLS = [
   { id: 'opencv',    label: 'DNN'       },
+  { id: 'dml',       label: 'DirectML'  },
   { id: 'yolo',      label: 'YOLO'      },
   { id: 'on-device', label: 'On Device' },
 ];
@@ -176,7 +177,7 @@ function ConfigureAndUploadStep({
         <div className="formai-configure__label-row">
           <span className="formai-configure__section-label">Processing</span>
           <InfoPopover id="info-protocol">
-            <p><strong>DNN</strong> — OpenCV-based, fastest, good for well-lit videos.<br /><strong>YOLO</strong> — Best accuracy, recommended for most users.<br /><strong>On Device</strong> — Routes privately through YOLO in Phase 1; full local inference in Phase 2.</p>
+            <p><strong>DNN</strong> — OpenCV-based, fastest, good for well-lit videos.<br /><strong>DirectML</strong> — GPU accelerated inference on Windows (AMD/Intel/Nvidia).<br /><strong>YOLO</strong> — Best accuracy, recommended for most users.<br /><strong>On Device</strong> — Routes privately through YOLO in Phase 1; full local inference in Phase 2.</p>
           </InfoPopover>
         </div>
         <div className="formai-segmented" role="radiogroup" aria-label="Processing protocol">
@@ -852,7 +853,8 @@ export function FormAICoach() {
 
     // ── Unified debug telemetry (all methods) ──────────────────────────
     const debugMethod = protocol === 'on-device' ? 'on-device'
-                      : protocol === 'yolo' ? 'yolo' : 'dnn';
+                      : protocol === 'yolo' ? 'yolo'
+                      : protocol === 'dml' ? 'dml' : 'dnn';
     const debugLogger = DEBUG_ENABLED
       ? new UnifiedDebugLogger(debugMethod, exerciseType, cameraAngle)
       : null;

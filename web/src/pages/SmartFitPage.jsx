@@ -31,7 +31,7 @@ export default function SmartFitPage() {
       <main
         className="ai-labs"
         id="main-content"
-        style={{ paddingBottom: 'calc(var(--nav-height-mobile) + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'calc(var(--nav-height-mobile, 60px) + env(safe-area-inset-bottom, 0px))' }}
       >
         <SmartFitGuide />
       </main>

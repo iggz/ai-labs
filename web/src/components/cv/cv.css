@@ -2325,11 +2325,11 @@ details[open] .formai-setup-page__detail-summary::before {
 
 /* ── Setup page — sticky footer, scroll area ──────────────────────────────── */
 .formai-setup-page__fixed-wrapper {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  bottom: calc(var(--nav-height-mobile, 60px) + env(safe-area-inset-bottom));
+  bottom: calc(var(--nav-height-mobile, 60px) + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   background: var(--cv-dark);
@@ -2365,7 +2365,7 @@ details[open] .formai-setup-page__detail-summary::before {
   max-width: 680px;
   margin: 0 auto;
   width: 100%;
-  padding: 1rem 1.25rem;
+  padding: 1rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--cv-border);
   display: flex;
   flex-direction: column;
@@ -2440,8 +2440,9 @@ details[open] .formai-setup-page__detail-summary::before {
 
 @media (min-width: 768px) {
   .ai-labs {
-    height: calc(100dvh - var(--nav-height-desktop, 56px));
-    /* Desktop: sticky nav takes 56px from the flow, so this starts below it */
+    flex: 1;
+    min-height: 0;
+    height: auto;
     overflow-y: auto;
   }
 }

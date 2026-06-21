@@ -47,7 +47,7 @@ export default function FormAISetupPage() {
   };
 
   return (
-    <main className="formai-setup-page ai-labs" id="main-content">
+    <main className="formai-setup-page ai-labs" id="main-content" style={{ overflow: 'hidden' }}>
       <Helmet>
         <title>FormAI Setup — AI Labs</title>
         <meta
