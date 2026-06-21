@@ -2,19 +2,57 @@
  * cvApi.js — CV Engine API Client
  * ================================
  * Handles video/photo submission, job polling, and retention management.
- * Communicates with the local FastAPI CV engine via the Vercel proxy.
+ * Communicates with the FastAPI CV engine via Cloudflare Tunnels.
+ *
+ * Multi-device routing (production):
+ *   yolo    → https://api-mac.ilovetoridemybicycle.com  (Mac, CoreML/ANE)
+ *   dml     → https://api.ilovetoridemybicycle.com      (PC, AMD DirectML)
+ *   opencv  → https://api.ilovetoridemybicycle.com      (PC, default)
+ *
+ * Developer override: set localStorage key 'AILABS_CV_API_URL' to redirect
+ * all protocols to a local or staging host (takes priority over everything).
  *
  * Debug telemetry (when ?debug=1):
  *   Wraps fetch calls with timing markers from UnifiedDebugLogger.
  *   Passes `debug=1` to the server so it returns debug_timings.
  */
 
+// ── Production routing table ──────────────────────────────────────────────────
+const PROTOCOL_HOSTS = {
+  yolo:   'https://api-mac.ilovetoridemybicycle.com',  // Mac — CoreML / ANE
+  dml:    'https://api.ilovetoridemybicycle.com',      // PC  — AMD DirectML
+  opencv: 'https://api.ilovetoridemybicycle.com',      // PC  — OpenCV DNN (default)
+};
+
+/**
+ * Returns the API base URL for generic use (health checks, retention, etc.).
+ * Respects the localStorage developer override.
+ */
 export function getApiBase() {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('AILABS_CV_API_URL');
     if (custom) return custom.trim().replace(/\/$/, '');
   }
   return import.meta.env.VITE_CV_API_URL || 'http://localhost:8080';
+}
+
+/**
+ * Returns the API base URL for a specific inference protocol.
+ * Priority: localStorage override > VITE_CV_API_URL env > protocol routing table.
+ *
+ * @param {string} protocol — 'yolo' | 'dml' | 'opencv' | 'on-device'
+ */
+export function getApiBaseForProtocol(protocol) {
+  // 1. Developer override always wins (covers all protocols)
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('AILABS_CV_API_URL');
+    if (custom) return custom.trim().replace(/\/$/, '');
+  }
+  // 2. Build-time env var override
+  const envUrl = import.meta.env.VITE_CV_API_URL;
+  if (envUrl) return envUrl;
+  // 3. Protocol-based production routing
+  return PROTOCOL_HOSTS[protocol] ?? PROTOCOL_HOSTS.opencv;
 }
 
 /**
@@ -43,10 +81,16 @@ export async function submitAnalysis(file, analysisType, extraFields = {}, onPro
     formData.append('debug', 'true');
   }
 
+  // Resolve the correct backend host for this protocol.
+  // Pinned for both submit AND all subsequent poll requests so they always
+  // hit the same machine (PC or Mac).
+  const protocol = extraFields.protocol ?? 'opencv';
+  const apiBase  = getApiBaseForProtocol(protocol);
+
   // 1. Submit job
   debugLogger?.markUploadStart();
 
-  const submitRes = await fetch(`${getApiBase()}/api/v1/analyze/${analysisType}`, {
+  const submitRes = await fetch(`${apiBase}/api/v1/analyze/${analysisType}`, {
     method: 'POST',
     body: formData,
   });
@@ -59,11 +103,11 @@ export async function submitAnalysis(file, analysisType, extraFields = {}, onPro
   const { job_id, position, estimated_wait_seconds } = await submitRes.json();
 
   debugLogger?.markUploadComplete();
-  debugLogger?.event('network', `Job submitted: ${job_id}`, { position });
+  debugLogger?.event('network', `Job submitted: ${job_id}`, { position, host: apiBase });
 
   onProgress?.({ phase: 'queued', position, estimatedWait: estimated_wait_seconds });
 
-  // 2. Poll for completion (3-second intervals)
+  // 2. Poll for completion (3-second intervals, same host as submit)
   return new Promise((resolve, reject) => {
     let cancelled = false;
     let hasStartedProcessing = false;
@@ -71,7 +115,7 @@ export async function submitAnalysis(file, analysisType, extraFields = {}, onPro
     const pollInterval = setInterval(async () => {
       if (cancelled) return;
       try {
-        const statusRes = await fetch(`${getApiBase()}/api/v1/jobs/${job_id}`);
+        const statusRes = await fetch(`${apiBase}/api/v1/jobs/${job_id}`);
         if (!statusRes.ok) throw new Error(`Status check failed: ${statusRes.status}`);
         const status = await statusRes.json();
 
@@ -92,7 +136,7 @@ export async function submitAnalysis(file, analysisType, extraFields = {}, onPro
 
           const resData = status.result;
           if (resData && resData.signed_url && resData.signed_url.startsWith('/static/')) {
-            resData.signed_url = `${getApiBase()}${resData.signed_url}`;
+            resData.signed_url = `${apiBase}${resData.signed_url}`;
           }
 
           // Capture download size from server timings if available

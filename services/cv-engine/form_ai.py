@@ -14,6 +14,7 @@ Feature 8: overlay_mode ('full'|'minimal') flows through to overlay functions.
 """
 
 # ── Standard library ──────────────────────────────────────────────────────────
+import sys
 import cv2
 import numpy as np
 import tempfile
@@ -46,14 +47,15 @@ logger = logging.getLogger(__name__)
 
 from dnn_pose import OpenCVPoseModel
 
-_opencv_model = None
-_yolo_model = None
-_dml_model = None
+_opencv_model  = None
+_yolo_model    = None
+_dml_model     = None
+_coreml_model  = None
 
 
 def _get_pose_model(protocol: str = "opencv"):
     """Lazy-load and cache the requested inference backend."""
-    global _opencv_model, _yolo_model, _dml_model
+    global _opencv_model, _yolo_model, _dml_model, _coreml_model
     if protocol == "opencv":
         if _opencv_model is None:
             _opencv_model = OpenCVPoseModel("yolov8s-pose.onnx")
@@ -61,8 +63,16 @@ def _get_pose_model(protocol: str = "opencv"):
         return _opencv_model
     elif protocol == "yolo":
         if _yolo_model is None:
-            from yolo_pose import UltralyticsYOLOModel
-            _yolo_model = UltralyticsYOLOModel("yolov8s-pose.pt")
+            if sys.platform == "darwin":
+                # macOS Apple Silicon → CoreML / Apple Neural Engine
+                from coreml_pose import CoreMLPoseModel
+                _yolo_model = CoreMLPoseModel("yolov8s-pose.mlpackage")
+                logger.info(f"CoreML model loaded on: {_yolo_model.device}")
+            else:
+                # Windows / Linux → Ultralytics + PyTorch (MPS or CPU)
+                from yolo_pose import UltralyticsYOLOModel
+                _yolo_model = UltralyticsYOLOModel("yolov8s-pose.pt")
+                logger.info(f"Ultralytics YOLO model loaded on: {_yolo_model.device}")
         return _yolo_model
     elif protocol == "dml":
         if _dml_model is None:
@@ -115,7 +125,12 @@ def _process_form_ai_sync(payload: dict) -> dict:
     debug = payload.get("debug", False)
 
     t_model = time.perf_counter()
-    was_cached = (_opencv_model is not None) if protocol == "opencv" else (_yolo_model is not None)
+    was_cached = (
+        (_opencv_model is not None) if protocol == "opencv"
+        else (_yolo_model is not None) if protocol == "yolo"
+        else (_dml_model is not None) if protocol == "dml"
+        else False
+    )
     pose_model = _get_pose_model(protocol)
     model_load_ms = round((time.perf_counter() - t_model) * 1000, 1)
     smoother = KeypointSmoother(num_keypoints=17, max_interpolation_frames=8)

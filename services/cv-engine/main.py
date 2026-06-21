@@ -167,6 +167,7 @@ app.add_middleware(
         "https://www.heatherhollybody.com",
         "https://ilovetoridemybicycle.com",
         "https://www.ilovetoridemybicycle.com",
+        "https://api-mac.ilovetoridemybicycle.com",
         "https://heather-holly-body.vercel.app",
         "https://heatherhollybody.vercel.app",
         "https://ai-labs.ipopenov.workers.dev",

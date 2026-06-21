@@ -7,6 +7,7 @@ web/dist/
 # Model files (stay local, never committed)
 *.onnx
 *.pt
+*.mlpackage
 
 # Debug/temp
 debug_videos/

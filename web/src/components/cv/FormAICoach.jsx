@@ -743,6 +743,7 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
           exerciseType={exercise_type}
           processingLog={processing_log}
           cameraAngleWarnings={camera_angle_warnings}
+          sessionTimestamps={result?._timestamps}
         />
 
         {/* Analyze Another — bottom of dashboard */}
@@ -850,6 +851,7 @@ export function FormAICoach() {
     setStep('processing');
 
     const consentToken = crypto.randomUUID();
+    const uploadedAt   = new Date();  // ← timestamp: moment user hits submit
 
     // ── Unified debug telemetry (all methods) ──────────────────────────
     const debugMethod = protocol === 'on-device' ? 'on-device'
@@ -894,6 +896,9 @@ export function FormAICoach() {
           debugLogger,  // passes to cvApi for network timing instrumentation
         );
       }
+
+      // Attach timestamps for dashboard display (Eastern Time rendered client-side)
+      res._timestamps = { uploadedAt, processedAt: new Date() };
 
       // Extract accuracy metrics and send the unified log
       debugLogger?.setAccuracy(res.metadata);

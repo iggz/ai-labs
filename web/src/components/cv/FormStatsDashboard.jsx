@@ -579,8 +579,54 @@ function sentimentLine(grade, exerciseLabel) {
   return map[grade] || `${exerciseLabel} analysis complete`;
 }
 
+// ── Eastern Time formatter ───────────────────────────────────────────────
+function toEasternTime(date) {
+  if (!date) return '—';
+  return date.toLocaleString('en-US', {
+    timeZone:     'America/New_York',
+    month:        'short',
+    day:          'numeric',
+    year:         'numeric',
+    hour:         'numeric',
+    minute:       '2-digit',
+    second:       '2-digit',
+    hour12:       true,
+    timeZoneName: 'short',  // renders "EDT" in summer, "EST" in winter automatically
+  });
+}
+
+// ── Session Timestamp Card ─────────────────────────────────────────────
+function SessionTimestampCard({ uploadedAt, processedAt }) {
+  const durationSec = (uploadedAt && processedAt)
+    ? ((processedAt - uploadedAt) / 1000).toFixed(1)
+    : null;
+
+  return (
+    <div className="stats-timestamp-card" aria-label="Session timing">
+      <div className="stats-timestamp-card__row">
+        <span className="stats-timestamp-card__label">📤 Uploaded</span>
+        <time className="stats-timestamp-card__value" dateTime={uploadedAt?.toISOString()}>
+          {toEasternTime(uploadedAt)}
+        </time>
+      </div>
+      <div className="stats-timestamp-card__row">
+        <span className="stats-timestamp-card__label">✅ Processed</span>
+        <time className="stats-timestamp-card__value" dateTime={processedAt?.toISOString()}>
+          {toEasternTime(processedAt)}
+        </time>
+      </div>
+      {durationSec != null && (
+        <div className="stats-timestamp-card__row stats-timestamp-card__row--duration">
+          <span className="stats-timestamp-card__label">⏱ Total time</span>
+          <span className="stats-timestamp-card__value">{durationSec}s</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
-export function FormStatsDashboard({ stats, exerciseType, processingLog, cameraAngleWarnings = {} }) {
+export function FormStatsDashboard({ stats, exerciseType, processingLog, cameraAngleWarnings = {}, sessionTimestamps }) {
   const meta = EXERCISE_META[exerciseType] || EXERCISE_META.squat;
   const [mounted, setMounted] = useState(false);
 
@@ -740,6 +786,14 @@ export function FormStatsDashboard({ stats, exerciseType, processingLog, cameraA
         avgConfidence={avg_confidence}
         cameraElevation={cameraElevation}
       />
+
+      {/* ── Session timestamps (Eastern Time) ── */}
+      {sessionTimestamps && (
+        <SessionTimestampCard
+          uploadedAt={sessionTimestamps.uploadedAt}
+          processedAt={sessionTimestamps.processedAt}
+        />
+      )}
 
       {/* ── Disclaimer footer ── */}
       <p className="stats-dashboard__disclaimer">

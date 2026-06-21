@@ -775,6 +775,41 @@
   max-width: 400px;
   line-height: 1.6;
 }
+/* ── Session Timestamp Card ──────────────────────────────────────────────── */
+.stats-timestamp-card {
+  background:    var(--cv-surface, rgba(255, 255, 255, 0.04));
+  border:        1px solid var(--cv-border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding:       14px 18px;
+  margin-top:    12px;
+  display:       flex;
+  flex-direction: column;
+  gap:           8px;
+}
+.stats-timestamp-card__row {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     center;
+  gap:             12px;
+  flex-wrap:       wrap;
+}
+.stats-timestamp-card__row--duration {
+  padding-top:  6px;
+  border-top:   1px solid var(--cv-border, rgba(255, 255, 255, 0.08));
+  margin-top:   2px;
+}
+.stats-timestamp-card__label {
+  font-size:   0.78rem;
+  color:       var(--cv-text-muted);
+  white-space: nowrap;
+}
+.stats-timestamp-card__value {
+  font-size:             0.82rem;
+  color:                 var(--cv-text);
+  font-variant-numeric:  tabular-nums;
+  text-align:            right;
+}
+
 .stats-dashboard__disclaimer {
   color: var(--cv-text-muted);
   font-size: 0.78rem;
@@ -783,6 +818,7 @@
   padding-top: 1rem;
   margin: 0;
 }
+
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
 .stats-header {
