@@ -171,7 +171,7 @@ app.add_middleware(
         "https://heatherhollybody.vercel.app",
         "https://ai-labs.ipopenov.workers.dev",
     ],
-    allow_origin_regex=r"https://.*\.(vercel\.app|workers\.dev)",
+    allow_origin_regex=r"https://.*\.(vercel\.app|workers\.dev|trycloudflare\.com)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
