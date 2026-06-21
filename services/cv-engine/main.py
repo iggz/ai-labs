@@ -18,9 +18,11 @@ Privacy:
 """
 
 import os
+import socket
 import logging
 import tempfile
 import hashlib
+import time as _time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
@@ -41,8 +43,17 @@ from form_ai import process_form_ai
 from slingshot import process_slingshot
 from smartfit import process_smartfit
 
-# ── Logging ───────────────────────────────────────────────────────────────────
-logging.basicConfig(level=logging.INFO)
+# ── Logging ─────────────────────────────────────────────────────────────────
+# Structured logging with ISO-8601 timestamps so log lines can be cross-
+# referenced with DB created_at / updated_at timestamps.
+_MACHINE_ID_FOR_LOG = os.environ.get("MACHINE_ID", "unknown")
+_log_formatter = logging.Formatter(
+    fmt=f'%(asctime)s [%(levelname)s] [machine={_MACHINE_ID_FOR_LOG}] %(name)s: %(message)s',
+    datefmt='%Y-%m-%dT%H:%M:%S',
+)
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(_log_formatter)
+logging.basicConfig(level=logging.INFO, handlers=[_log_handler], force=True)
 logger = logging.getLogger(__name__)
 
 # ── Local Debug Configuration ─────────────────────────────────────────────────
@@ -60,6 +71,18 @@ if SUPABASE_URL and SUPABASE_SERVICE_KEY:
     logger.info("Supabase client initialized")
 else:
     logger.warning("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set — DB writes disabled")
+
+# ── Machine Identity ──────────────────────────────────────────────────────────
+# Set MACHINE_ID in .env to 'mac' or 'pc'. Written to every cv_analyses row
+# so you can audit which machine processed each job from the database.
+MACHINE_ID        = os.environ.get("MACHINE_ID", "unknown")
+MACHINE_HOSTNAME  = socket.gethostname()
+INFERENCE_BACKEND = os.environ.get("INFERENCE_BACKEND", "opencv_dnn")
+_SERVER_START_TIME = _time.time()
+logger.info(
+    f"Machine identity — id={MACHINE_ID} hostname={MACHINE_HOSTNAME} "
+    f"backend={INFERENCE_BACKEND}"
+)
 
 # ── Job Queue ─────────────────────────────────────────────────────────────────
 job_queue = CVJobQueue()
@@ -261,6 +284,17 @@ async def _record_analysis(
     consent_token: str,
     user_id: str | None = None,
     email_hash: str | None = None,
+    # ── Routing audit fields ──────────────────────────────────────────────────
+    protocol: str | None = None,           # 'yolo' | 'dml' | 'opencv' | 'on-device'
+    machine_id: str | None = None,         # 'mac' | 'pc' — set by MACHINE_ID in .env
+    machine_hostname: str | None = None,   # os.uname e.g. 'iggypop-macstudio'
+    inference_backend: str | None = None,  # 'opencv_dnn' | 'coreml' | 'directml'
+    processing_time_ms: int | None = None, # wall-clock ms from job.started_at → completed_at
+    queue_wait_ms: int | None = None,      # ms from job.created_at → started_at
+    file_size_bytes: int | None = None,    # raw input video size in bytes
+    camera_angle: str | None = None,       # 'front' | 'side' | 'auto'
+    build_hash: str | None = None,         # X-Build-Hash header from frontend
+    client_ip: str | None = None,          # CF-Connecting-IP header
 ) -> str | None:
     """Insert a non-biometric cv_analyses record. Returns record ID."""
     if not supabase:
@@ -284,12 +318,37 @@ async def _record_analysis(
     if email_hash:
         record["email_hash"] = email_hash
 
+    # Routing audit — only set fields that are not None so we don't overwrite
+    # existing rows with nulls if called from a path that doesn't supply them.
+    audit = {
+        "protocol":           protocol,
+        "machine_id":         machine_id,
+        "machine_hostname":   machine_hostname,
+        "inference_backend":  inference_backend,
+        "processing_time_ms": processing_time_ms,
+        "queue_wait_ms":      queue_wait_ms,
+        "file_size_bytes":    file_size_bytes,
+        "camera_angle":       camera_angle,
+        "build_hash":         build_hash,
+        "client_ip":          client_ip,
+    }
+    record.update({k: v for k, v in audit.items() if v is not None})
+
     try:
         resp = supabase.table("cv_analyses").insert(record).execute()
-        return resp.data[0]["id"] if resp.data else None
+        if resp.data:
+            analysis_id = resp.data[0]["id"]
+            logger.info(
+                f"DB record created — id={analysis_id} protocol={protocol} "
+                f"machine={machine_id} backend={inference_backend} "
+                f"proc_ms={processing_time_ms} queue_ms={queue_wait_ms}"
+            )
+            return analysis_id
+        return None
     except Exception as exc:
         logger.error(f"DB insert failed: {exc}")
         return None
+
 
 
 # ── Wrapped SlingShot processor (handles upload after processing) ─────────────
@@ -317,12 +376,14 @@ async def _process_slingshot_with_upload(payload: dict) -> dict:
 
 @app.post("/api/v1/analyze/form-ai")
 async def analyze_form(
+    request: Request,
     file: UploadFile = File(...),
     exercise_type: str = Form("squat"),
     consent_token: str = Form(...),
     user_id: str = Form(None),
     overlay_mode: str = Form("full"),
     protocol: str = Form("opencv"),
+    camera_angle: str = Form("auto"),
     debug: bool = Form(False),
 ):
     """Submit a video for FormAI pose analysis."""
@@ -334,21 +395,35 @@ async def analyze_form(
     if protocol not in ("opencv", "yolo", "dml"):
         raise HTTPException(422, "protocol must be 'opencv', 'yolo', or 'dml'")
 
+    # Capture routing audit fields from request headers
+    client_ip  = request.headers.get("CF-Connecting-IP") or request.client.host
+    build_hash = request.headers.get("X-Build-Hash", "unknown")
+
     # Read into memory (never written to disk by this endpoint)
     video_bytes = await file.read()
     if len(video_bytes) > MAX_VIDEO_BYTES:
         raise HTTPException(413, "File exceeds 100MB limit")
 
+    logger.info(
+        f"FormAI submit — protocol={protocol} exercise={exercise_type} "
+        f"size_bytes={len(video_bytes)} client_ip={client_ip} build={build_hash}"
+    )
+
     try:
         job = await job_queue.submit("form_ai", {
-            "video_bytes": video_bytes,
-            "filename": file.filename,
-            "exercise_type": exercise_type,
-            "consent_token": consent_token,
-            "user_id": user_id,
-            "overlay_mode": overlay_mode,  # Feature 8
-            "protocol": protocol,  # Dual protocol toggle
-            "debug": debug,  # Debug telemetry toggle
+            "video_bytes":     video_bytes,
+            "filename":        file.filename,
+            "exercise_type":   exercise_type,
+            "consent_token":   consent_token,
+            "user_id":         user_id,
+            "overlay_mode":    overlay_mode,   # Feature 8
+            "protocol":        protocol,        # Dual protocol toggle
+            "camera_angle":    camera_angle,    # Routing audit
+            "debug":           debug,           # Debug telemetry toggle
+            # Routing audit metadata (passed through to _record_analysis)
+            "file_size_bytes": len(video_bytes),
+            "client_ip":       client_ip,
+            "build_hash":      build_hash,
         })
     except QueueFullError as exc:
         raise HTTPException(503, str(exc))
@@ -359,6 +434,7 @@ async def analyze_form(
         "position": job.position_in_queue,
         "estimated_wait_seconds": job.position_in_queue * 30,
     }
+
 
 
 @app.post("/api/v1/analyze/slingshot")
@@ -450,10 +526,20 @@ async def get_job_status(job_id: str):
             if annotated_bytes:
                 object_name = f"form-ai/{job.id}.mp4"
                 signed_url = await _upload_to_supabase_storage(
-                    annotated_bytes, 
-                    object_name, 
+                    annotated_bytes,
+                    object_name,
                     exercise_type=job.payload.get("exercise_type")
                 )
+
+            # Compute timing metrics from job lifecycle timestamps
+            process_ms = (
+                round((job.completed_at - job.started_at) * 1000)
+                if job.completed_at and job.started_at else None
+            )
+            queue_ms = (
+                round((job.started_at - job.created_at) * 1000)
+                if job.started_at and job.created_at else None
+            )
 
             analysis_id = await _record_analysis(
                 "form_ai",
@@ -461,6 +547,17 @@ async def get_job_status(job_id: str):
                 signed_url,
                 job.payload.get("consent_token", ""),
                 user_id=job.payload.get("user_id"),
+                # Routing audit fields
+                protocol=job.payload.get("protocol"),
+                camera_angle=job.payload.get("camera_angle"),
+                machine_id=MACHINE_ID,
+                machine_hostname=MACHINE_HOSTNAME,
+                inference_backend=INFERENCE_BACKEND,
+                processing_time_ms=process_ms,
+                queue_wait_ms=queue_ms,
+                file_size_bytes=job.payload.get("file_size_bytes"),
+                client_ip=job.payload.get("client_ip"),
+                build_hash=job.payload.get("build_hash"),
             )
             response["result"] = {
                 "analysis_id": analysis_id,
@@ -472,6 +569,7 @@ async def get_job_status(job_id: str):
             debug_timings = result.get("debug_timings")
             if debug_timings:
                 response["result"]["debug_timings"] = debug_timings
+
 
         # For SlingShot
         elif "stats" in result or "signed_url" in result:
@@ -567,15 +665,18 @@ async def root():
 
 @app.get("/api/v1/health")
 async def health_check():
-    """Health check — reports inference backend and queue depth."""
+    """Health check — reports machine identity, inference backend, and queue depth."""
     import cv2
 
     return {
-        "status": "healthy",
-        "inference_backend": "opencv_dnn",
-        "opencv_version": cv2.__version__,
-        "opencv_opencl": cv2.ocl.haveOpenCL(),
-        "queue_depth": job_queue.get_queue_depth(),
-        "active_job": job_queue.active_job.id if job_queue.active_job else None,
+        "status":             "healthy",
+        "machine_id":         MACHINE_ID,
+        "hostname":           MACHINE_HOSTNAME,
+        "inference_backend":  INFERENCE_BACKEND,
+        "uptime_seconds":     round(_time.time() - _SERVER_START_TIME),
+        "opencv_version":     cv2.__version__,
+        "opencv_opencl":      cv2.ocl.haveOpenCL(),
+        "queue_depth":        job_queue.get_queue_depth(),
+        "active_job":         job_queue.active_job.id if job_queue.active_job else None,
         "supabase_connected": supabase is not None,
     }

@@ -92,6 +92,11 @@ export async function submitAnalysis(file, analysisType, extraFields = {}, onPro
 
   const submitRes = await fetch(`${apiBase}/api/v1/analyze/${analysisType}`, {
     method: 'POST',
+    headers: {
+      // Tell the backend which frontend build submitted this job.
+      // VITE_BUILD_HASH is the git short hash baked in at build time (vite.config.js).
+      'X-Build-Hash': import.meta.env.VITE_BUILD_HASH ?? 'unknown',
+    },
     body: formData,
   });
 
