@@ -27,7 +27,7 @@ import threading
 import logging
 import numpy as np
 
-from encoding_utils import USE_HW_ENCODER, get_encoder, get_encoder_flags
+from encoding_utils import USE_HW_ENCODER, get_encoder, get_encoder_flags, FFMPEG_EXE
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class FFmpegPipeWriter:
         )
 
         cmd = [
-            "ffmpeg", "-y",
+            FFMPEG_EXE, "-y",
             # Input from stdin — raw BGR frames
             "-f", "rawvideo",
             "-vcodec", "rawvideo",
@@ -121,6 +121,12 @@ class FFmpegPipeWriter:
         )
         self._reader_thread.start()
 
+        self._stderr_buf = io.BytesIO()
+        self._stderr_thread = threading.Thread(
+            target=self._drain_stderr, daemon=True
+        )
+        self._stderr_thread.start()
+
     # ── Context manager support ───────────────────────────────────────────────
 
     def __enter__(self) -> "FFmpegPipeWriter":
@@ -156,6 +162,7 @@ class FFmpegPipeWriter:
         except Exception:
             pass
         self._reader_thread.join(timeout=5)
+        self._stderr_thread.join(timeout=5)
         try:
             self.process.wait(timeout=5)
         except Exception:
@@ -168,6 +175,14 @@ class FFmpegPipeWriter:
                 self._output_buf.write(chunk)
         except Exception:
             pass  # Process termination is handled in finish()
+
+    def _drain_stderr(self) -> None:
+        """Background thread: read all of FFmpeg's stderr until EOF."""
+        try:
+            for chunk in iter(lambda: self.process.stderr.read(4096), b""):
+                self._stderr_buf.write(chunk)
+        except Exception:
+            pass
 
     def write(self, frame: np.ndarray) -> None:
         """
@@ -184,7 +199,7 @@ class FFmpegPipeWriter:
         try:
             self.process.stdin.write(frame.tobytes())
         except BrokenPipeError:
-            stderr_bytes = self.process.stderr.read()
+            stderr_bytes = self._stderr_buf.getvalue()
             raise RuntimeError(
                 f"FFmpeg process died unexpectedly.\nFFmpeg stderr:\n"
                 f"{stderr_bytes.decode(errors='replace')}"
@@ -211,11 +226,13 @@ class FFmpegPipeWriter:
 
         self.process.stdin.close()
         self._reader_thread.join(timeout=self._timeout)
-        if self._reader_thread.is_alive():
+        self._stderr_thread.join(timeout=self._timeout)
+        if self._reader_thread.is_alive() or self._stderr_thread.is_alive():
             self.process.kill()
             self._reader_thread.join(timeout=5)
-            raise RuntimeError("FFmpeg encoding timed out (reader thread still alive)")
-        stderr_bytes = self.process.stderr.read()
+            self._stderr_thread.join(timeout=5)
+            raise RuntimeError("FFmpeg encoding timed out (reader/stderr threads still alive)")
+        stderr_bytes = self._stderr_buf.getvalue()
         try:
             self.process.wait(timeout=self._timeout)
         except subprocess.TimeoutExpired:

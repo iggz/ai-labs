@@ -10,7 +10,7 @@ import tempfile
 import os
 import logging
 
-from encoding_utils import USE_HW_ENCODER, get_encoder, get_encoder_flags
+from encoding_utils import USE_HW_ENCODER, get_encoder, get_encoder_flags, FFMPEG_EXE
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def compress_video_hardware(
     logger.info(f"Encoding with {encoder} (HW={'yes' if USE_HW_ENCODER else 'no'})")
 
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG_EXE, "-y",
         "-i", input_path,
         "-vf", f"scale={target_width}:-2",
         "-r", str(target_fps),
@@ -116,7 +116,7 @@ def bytes_to_mp4_piped(
     encoder_flags = get_encoder_flags()
 
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG_EXE, "-y",
         "-i", "pipe:0",
         "-vf", f"scale={target_width}:-2",
         "-r", str(target_fps),
