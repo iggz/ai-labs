@@ -48,11 +48,12 @@ from dnn_pose import OpenCVPoseModel
 
 _opencv_model = None
 _yolo_model = None
+_dml_model = None
 
 
 def _get_pose_model(protocol: str = "opencv"):
     """Lazy-load and cache the requested inference backend."""
-    global _opencv_model, _yolo_model
+    global _opencv_model, _yolo_model, _dml_model
     if protocol == "opencv":
         if _opencv_model is None:
             _opencv_model = OpenCVPoseModel("yolov8s-pose.onnx")
@@ -63,6 +64,12 @@ def _get_pose_model(protocol: str = "opencv"):
             from yolo_pose import UltralyticsYOLOModel
             _yolo_model = UltralyticsYOLOModel("yolov8s-pose.pt")
         return _yolo_model
+    elif protocol == "dml":
+        if _dml_model is None:
+            from dml_pose import DMLPoseModel
+            _dml_model = DMLPoseModel("yolov8s-pose.onnx")
+            logger.info(f"DirectML model loaded on: {_dml_model.device}")
+        return _dml_model
     else:
         raise ValueError(f"Unknown protocol: {protocol}")
 

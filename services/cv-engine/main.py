@@ -30,6 +30,11 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load local environment variables from .env file
+load_dotenv()
+
 
 from job_queue import CVJobQueue, QueueFullError
 from form_ai import process_form_ai
@@ -325,8 +330,8 @@ async def analyze_form(
         raise HTTPException(422, "exercise_type must be squat, deadlift, hip_thrust, or auto")
     if overlay_mode not in ("full", "minimal"):
         raise HTTPException(422, "overlay_mode must be 'full' or 'minimal'")
-    if protocol not in ("opencv", "yolo"):
-        raise HTTPException(422, "protocol must be 'opencv' or 'yolo'")
+    if protocol not in ("opencv", "yolo", "dml"):
+        raise HTTPException(422, "protocol must be 'opencv', 'yolo', or 'dml'")
 
     # Read into memory (never written to disk by this endpoint)
     video_bytes = await file.read()

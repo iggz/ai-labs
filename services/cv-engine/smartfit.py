@@ -72,21 +72,47 @@ def _extract_body_proportions(image_bytes: bytes) -> Optional[dict]:
         logger.warning("Could not decode image bytes")
         return None
 
-    # Lazy-load pose model
-    from ultralytics import YOLO
-    import torch
+    # Try to load ONNX model (DirectML or OpenCV DNN) if available
+    import os
+    use_onnx = os.path.exists("yolov8s-pose.onnx")
+    
+    if use_onnx:
+        try:
+            try:
+                from dml_pose import DMLPoseModel
+                model = DMLPoseModel("yolov8s-pose.onnx")
+                logger.info(f"SmartFit: Loaded DirectML pose model ({model.device})")
+            except Exception:
+                from dnn_pose import OpenCVPoseModel
+                model = OpenCVPoseModel("yolov8s-pose.onnx")
+                logger.info(f"SmartFit: Loaded OpenCV pose model ({model.device})")
+                
+            result = model.predict(img)
+            kps = result["keypoints"]
+            confs = result["confidences"]
+            # If the model returned zero keypoints, treat it as a detection failure
+            if np.all(kps == 0):
+                return None
+        except Exception as e:
+            logger.warning(f"ONNX inference failed in SmartFit: {e}. Falling back to Ultralytics.")
+            use_onnx = False
 
-    model = YOLO("yolov8s-pose.pt")
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
-    model.to(device)
+    if not use_onnx:
+        # Lazy-load pose model
+        from ultralytics import YOLO
+        import torch
 
-    results = model(img, verbose=False)
+        model = YOLO("yolov8s-pose.pt")
+        device = "mps" if torch.backends.mps.is_available() else "cpu"
+        model.to(device)
 
-    if not results[0].keypoints or len(results[0].keypoints.xy) == 0:
-        return None
+        results = model(img, verbose=False)
 
-    kps = results[0].keypoints.xy[0].cpu().numpy()       # (17, 2)
-    confs = results[0].keypoints.conf[0].cpu().numpy()   # (17,)
+        if not results[0].keypoints or len(results[0].keypoints.xy) == 0:
+            return None
+
+        kps = results[0].keypoints.xy[0].cpu().numpy()       # (17, 2)
+        confs = results[0].keypoints.conf[0].cpu().numpy()   # (17,)
 
     # COCO indices: l_shoulder=5, r_shoulder=6, l_hip=11, r_hip=12
     shoulder_conf = min(float(confs[5]), float(confs[6]))

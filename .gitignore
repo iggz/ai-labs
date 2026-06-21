@@ -22,5 +22,9 @@ services/cv-engine/.env
 # OS
 .DS_Store
 
-# Wrangler cache/state
+# Cloudflare Wrangler cache / state
 .wrangler/
+
+# Local processed/debug video output
+static/
+services/cv-engine/static/
