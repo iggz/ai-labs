@@ -50,6 +50,7 @@ class DMLPoseModel:
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
         self.conf_threshold = CONF_THRESHOLD
+        self._last_predict_ms: float = 0.0  # Per-frame timing, matches OpenCVPoseModel interface
 
         t1 = time.perf_counter()
         logger.info(
@@ -182,8 +183,10 @@ class DMLPoseModel:
             crop=False,
         )
 
-        # Run ONNX Runtime session
+        # Run ONNX Runtime session and track timing
+        t_infer = time.perf_counter()
         outputs = self.session.run([self.output_name], {self.input_name: blob})
+        self._last_predict_ms = (time.perf_counter() - t_infer) * 1000.0
         output = outputs[0]
 
         # Postprocess
