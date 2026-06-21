@@ -19,5 +19,11 @@
       "pattern": "ilovetoridemybicycle.com/ai-labs*",
       "zone_id": "0a3a58000de0c118405d1cea7f5797f8"
     }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "DEBUG_LOGS",
+      "id": "5f14c97e465a45bdaad5df8ae3fb6931"
+    }
   ]
 }

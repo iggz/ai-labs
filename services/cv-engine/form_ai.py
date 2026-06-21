@@ -21,6 +21,7 @@ import os
 import logging
 import time
 from typing import Generator
+from server_info import get_server_info
 
 # ── Analysis modules ─────────────────────────────────────────────────────────
 from smoother import KeypointSmoother
@@ -104,8 +105,12 @@ def _process_form_ai_sync(payload: dict) -> dict:
     overlay_mode: str  = payload.get("overlay_mode", "full")
     protocol: str      = payload.get("protocol", "opencv")
     filename: str      = payload.get("filename", "input.mp4")
+    debug = payload.get("debug", False)
 
+    t_model = time.perf_counter()
+    was_cached = (_opencv_model is not None) if protocol == "opencv" else (_yolo_model is not None)
     pose_model = _get_pose_model(protocol)
+    model_load_ms = round((time.perf_counter() - t_model) * 1000, 1)
     smoother = KeypointSmoother(num_keypoints=17, max_interpolation_frames=8)
 
     # Write video to temp file for OpenCV
@@ -144,9 +149,11 @@ def _process_form_ai_sync(payload: dict) -> dict:
         raw_confs_cache: list[np.ndarray] = []
         smoothed_kps_cache: list[np.ndarray] = []
 
+        frame_times_ms = []  # Per-frame inference timing
         frame_idx = 0
         for frame in _iter_frames(input_path):
             result = pose_model.predict(frame)
+            frame_times_ms.append(pose_model._last_predict_ms)
             raw_kps = result["keypoints"]
             raw_confs = result["confidences"]
 
@@ -200,6 +207,8 @@ def _process_form_ai_sync(payload: dict) -> dict:
 
             frame_idx += 1
 
+        t_loop_end = time.perf_counter()
+
         # ── Feature 5: Run exercise classifier if still 'auto' (short videos) ──
         # If the video was shorter than 60 frames, classification runs here.
         auto_exercise_type: str | None = None
@@ -241,6 +250,7 @@ def _process_form_ai_sync(payload: dict) -> dict:
         )
 
         t_analysis = time.perf_counter()
+        analysis_ms = round((t_analysis - t_start) * 1000, 1)
         logger.info(
             "Pass 1 (analysis): %.2fs (%d frames, %.1fms/frame)",
             t_analysis - t_start,
@@ -248,7 +258,12 @@ def _process_form_ai_sync(payload: dict) -> dict:
             (t_analysis - t_start) / max(1, len(angles_per_frame)) * 1000,
         )
 
+        # ── Post-processing timing ────────────────────────────────────────────
+        t_postprocess = time.perf_counter()
+
         # ── PASS 2: Render + Encode (zero inference, piped to FFmpeg) ────
+        t_render_start = time.perf_counter()
+        overlay_total_ms = 0.0
         with FFmpegPipeWriter(
             width=w, height=h, fps=fps,
             target_width=1280, target_bitrate="4M",
@@ -258,6 +273,7 @@ def _process_form_ai_sync(payload: dict) -> dict:
                 cached_confs = raw_confs_cache[idx] if idx < len(raw_confs_cache) else np.zeros(17)
                 a_val = angles_per_frame[idx] if idx < len(angles_per_frame) else None
                 # Render skeleton overlay (Feature 8: overlay_mode)
+                t_overlay = time.perf_counter()
                 annotated = create_neon_skeleton_frame(
                     frame,
                     cached_kps,
@@ -271,6 +287,7 @@ def _process_form_ai_sync(payload: dict) -> dict:
                 if a_val is not None and not np.isnan(a_val):
                     annotated = draw_rom_gauge(annotated, a_val, resolved_exercise, overlay_mode=overlay_mode)
                 annotated = draw_rep_counter(annotated, rep_count, overlay_mode=overlay_mode)
+                overlay_total_ms += (time.perf_counter() - t_overlay) * 1000
                 writer.write(annotated)
             compressed_bytes = writer.finish()
 
@@ -302,6 +319,30 @@ def _process_form_ai_sync(payload: dict) -> dict:
         # angles_per_frame / keypoints_history → go out of scope here (garbage collected)
         # BIOMETRIC DATA IS NEVER RETURNED OR STORED
 
+        # ── Build debug_timings (always collected, only returned if debug=True) ──
+        sorted_frame_times = sorted(frame_times_ms) if frame_times_ms else [0]
+        n_frames = len(frame_times_ms) or 1
+        debug_timings = {
+            "model_load_ms":        model_load_ms,
+            "cold_start":           not was_cached,
+            "video_decode_ms":      round((t_analysis - t_start - sum(frame_times_ms) / 1000) * 1000, 1) if frame_times_ms else 0,
+            "frame_count":          n_frames,
+            "input_resolution":     f"{w}×{h}",
+            "processing_resolution": f"{640}×{640}",
+            "inference_total_ms":   round(sum(frame_times_ms), 1),
+            "inference_per_frame_ms": round(sum(frame_times_ms) / n_frames, 1),
+            "inference_min_ms":     round(sorted_frame_times[0], 1),
+            "inference_max_ms":     round(sorted_frame_times[-1], 1),
+            "inference_p95_ms":     round(sorted_frame_times[min(int(n_frames * 0.95), n_frames - 1)], 1) if n_frames > 1 else round(sorted_frame_times[0], 1),
+            "postprocess_ms":       round((t_analysis - t_loop_end) * 1000, 1),
+            "overlay_render_ms":    round(overlay_total_ms, 1),
+            "video_encode_ms":      round((t_render - t_render_start) * 1000 - overlay_total_ms, 1),
+            "total_server_ms":      round((t_render - t_start) * 1000, 1),
+            "output_video_size_bytes": len(compressed_bytes),
+            "protocol":             protocol,
+            "server_info":          get_server_info(device=pose_model.device),
+        }
+
         return {
             # Non-biometric metadata only (stats are ephemeral, not stored)
             "metadata": {
@@ -325,6 +366,10 @@ def _process_form_ai_sync(payload: dict) -> dict:
                 "detected_camera_angle":       cam_det_result.detected_angle,
                 "camera_angle_spread_ratio":   round(cam_det_result.spread_ratio, 3),
             },
+            # Debug timings — always collected (cheap), only surfaced when debug=True
+            **({
+                "debug_timings": debug_timings
+            } if debug else {}),
         }
 
     finally:

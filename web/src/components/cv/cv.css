@@ -2340,7 +2340,7 @@ details[open] .formai-setup-page__detail-summary::before {
 @media (min-width: 768px) {
   .formai-setup-page__fixed-wrapper {
     top: var(--nav-height-desktop, 56px);
-    bottom: 0;
+    bottom: var(--nav-height-mobile, 60px);
   }
 }
 

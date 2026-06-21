@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from supabase import create_client, Client
@@ -317,6 +317,7 @@ async def analyze_form(
     user_id: str = Form(None),
     overlay_mode: str = Form("full"),
     protocol: str = Form("opencv"),
+    debug: bool = Form(False),
 ):
     """Submit a video for FormAI pose analysis."""
     # Feature 5: 'auto' triggers ExerciseClassifier in form_ai.py
@@ -341,6 +342,7 @@ async def analyze_form(
             "user_id": user_id,
             "overlay_mode": overlay_mode,  # Feature 8
             "protocol": protocol,  # Dual protocol toggle
+            "debug": debug,  # Debug telemetry toggle
         })
     except QueueFullError as exc:
         raise HTTPException(503, str(exc))
@@ -460,6 +462,10 @@ async def get_job_status(job_id: str):
                 "metadata": metadata,
                 "processing_log": result.get("processing_log", {}),
             }
+            # Include debug_timings if the processor returned them
+            debug_timings = result.get("debug_timings")
+            if debug_timings:
+                response["result"]["debug_timings"] = debug_timings
 
         # For SlingShot
         elif "stats" in result or "signed_url" in result:
@@ -490,7 +496,16 @@ async def get_job_status(job_id: str):
         response["position"] = job.position_in_queue
         response["estimated_wait_seconds"] = job.position_in_queue * 30
 
-    return response
+    # Add Server-Timing header for lightweight client-side timing collection
+    headers = {"Timing-Allow-Origin": "*"}
+    if job.status == "completed" and job.started_at and job.completed_at:
+        queue_ms = round((job.started_at - job.created_at) * 1000)
+        process_ms = round((job.completed_at - job.started_at) * 1000)
+        headers["Server-Timing"] = (
+            f"queue;dur={queue_ms};desc=\"Queue Wait\","
+            f"process;dur={process_ms};desc=\"Processing\""
+        )
+    return JSONResponse(content=response, headers=headers)
 
 
 @app.patch("/api/v1/analyses/{analysis_id}/retention")

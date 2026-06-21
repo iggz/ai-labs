@@ -1,7 +1,7 @@
 import * as ort from 'onnxruntime-web';
 
 // ── Constants ──
-const MODEL_INPUT_SIZE = 416;   // 640→416: ~58% fewer FLOPs, same anchor-free YOLO output
+const MODEL_INPUT_SIZE = 640;   // must match the ONNX model's export imgsz
 const CONF_THRESHOLD   = 0.25;
 const NMS_IOU          = 0.45;
 // In dev: Vite middleware serves model locally from services/cv-engine/ (no CORS issues)
@@ -11,12 +11,18 @@ const MODEL_URL = import.meta.env.PROD
   : '/models/yolov8s-pose.onnx';
 
 // ── Typed array pool ──
-// Reused across frames to avoid GC pressure (3 channels × 416 × 416)
+// Reused across frames to avoid GC pressure (3 channels × 640 × 640)
 const _chwBuf = new Float32Array(3 * MODEL_INPUT_SIZE * MODEL_INPUT_SIZE);
 
 // ── Singleton session ──
 let _session = null;
 let _device  = null;  // 'webgpu' | 'wasm'
+let _sessionVersion = 0;  // incremented on forceWasm() to invalidate stale runs
+
+// ── iOS detection ── WebGPU shader compilation hangs indefinitely on iOS WebKit
+const _isIOS = typeof navigator !== 'undefined' &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+   (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints ?? 0) > 1));
 
 /**
  * Load the ONNX model. Lazy singleton — safe to call multiple times.
@@ -36,11 +42,23 @@ export async function loadModel() {
   const providers = [];
 
   // WebGPU: available in Safari 17+ and Chrome. Test before adding.
-  if (typeof navigator !== 'undefined' && navigator.gpu) {
+  // SKIP on iOS — WebGPU shader compilation hangs indefinitely on iOS WebKit.
+  if (!_isIOS && typeof navigator !== 'undefined' && navigator.gpu) {
     try {
       const adapter = await navigator.gpu.requestAdapter();
-      if (adapter) providers.push('webgpu');
-    } catch { /* WebGPU not available */ }
+      if (adapter) {
+        providers.push('webgpu');
+        console.log('[onnxPose] WebGPU adapter found:', adapter.info?.device || 'unknown device');
+      } else {
+        console.log('[onnxPose] WebGPU: requestAdapter() returned null');
+      }
+    } catch (e) {
+      console.log('[onnxPose] WebGPU: requestAdapter() threw:', e.message);
+    }
+  } else if (_isIOS) {
+    console.log('[onnxPose] iOS detected — skipping WebGPU (shader compilation hangs)');
+  } else {
+    console.log('[onnxPose] WebGPU: navigator.gpu not present');
   }
   providers.push('wasm');  // always available as fallback
 
@@ -48,7 +66,32 @@ export async function loadModel() {
     executionProviders: providers,
   });
   _device = providers[0] === 'webgpu' ? 'webgpu' : 'wasm';
+  console.log(`[onnxPose] Model loaded, using: ${_device}`);
 
+  return { session: _session, device: _device };
+}
+
+/**
+ * Force the model to reload with WASM-only (no WebGPU).
+ * Called when WebGPU shader compilation times out.
+ */
+export async function forceWasm() {
+  // Don't await release() — the hung WebGPU session.run() may block it.
+  // Just null out the reference and let GC clean up the old session.
+  _sessionVersion++;  // invalidate any in-flight runs from the old session
+  if (_session) {
+    const oldSession = _session;
+    _session = null;
+    _device  = null;
+    // Fire-and-forget release — don't block on it
+    setTimeout(() => { try { oldSession.release(); } catch { /* ignore */ } }, 0);
+  }
+  console.log('[onnxPose] forceWasm: Reloading model with WASM-only…');
+  _session = await ort.InferenceSession.create(MODEL_URL, {
+    executionProviders: ['wasm'],
+  });
+  _device = 'wasm';
+  console.log('[onnxPose] forceWasm: Model loaded with WASM');
   return { session: _session, device: _device };
 }
 
@@ -80,7 +123,7 @@ export async function letterbox(imageSource, size = MODEL_INPUT_SIZE) {
   const dw    = Math.round((size - newW) / 2);
   const dh    = Math.round((size - newH) / 2);
 
-  // Create output canvas (size × size, gray fill)
+  // Create output canvas (size × size, gray fill for letterbox padding)
   let outCanvas;
   if (typeof OffscreenCanvas !== 'undefined') {
     outCanvas = new OffscreenCanvas(size, size);
@@ -104,9 +147,16 @@ export async function letterbox(imageSource, size = MODEL_INPUT_SIZE) {
     }
     tmp.getContext('2d').putImageData(imageSource, 0, 0);
     ctx.drawImage(tmp, dw, dh, newW, newH);
+  } else if (imageSource instanceof ImageBitmap) {
+    // ImageBitmap from play-through capture — use drawImage directly.
+    // Avoids calling createImageBitmap(imageBitmap, { resizeQuality }) which
+    // throws on iOS Safari (resizeQuality not supported for ImageBitmap sources).
+    // Since these are already ~640×360, the resize cost via drawImage is minimal.
+    ctx.drawImage(imageSource, dw, dh, newW, newH);
   } else if (typeof createImageBitmap !== 'undefined') {
-    // Fast path: GPU-accelerated resize via createImageBitmap compositor
-    // This avoids reading back the full-resolution frame to CPU
+    // GPU-accelerated resize via createImageBitmap compositor.
+    // Used for HTMLVideoElement sources (legacy seek-based path).
+    // This avoids reading back a full-resolution frame to CPU.
     let bmp;
     try {
       bmp = await createImageBitmap(imageSource, {

@@ -32,8 +32,9 @@ class OpenCVPoseModel:
         self.conf_threshold = CONF_THRESHOLD
         self._select_backend()
         t1 = time.perf_counter()
+        self.load_time_ms = round((t1 - t0) * 1000, 1)
         logger.info(
-            f"OpenCV DNN model loaded on {self.device} in {(t1-t0)*1000:.0f}ms"
+            f"OpenCV DNN model loaded on {self.device} in {self.load_time_ms:.0f}ms"
         )
 
     def _select_backend(self):
@@ -204,6 +205,8 @@ class OpenCVPoseModel:
                 "bbox": tuple (x1, y1, x2, y2) — bounding box in original frame space
                 "score": float — detection confidence
         """
+        t0 = time.perf_counter()
+
         # Update confidence threshold if caller overrides
         self.conf_threshold = conf_threshold
 
@@ -226,6 +229,9 @@ class OpenCVPoseModel:
 
         # Post-process
         result = self._postprocess(output, scale, pad)
+
+        # Track per-call inference time (essentially free)
+        self._last_predict_ms = round((time.perf_counter() - t0) * 1000, 2)
 
         if result is None:
             return {

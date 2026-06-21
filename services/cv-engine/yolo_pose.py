@@ -23,9 +23,11 @@ class UltralyticsYOLOModel:
         self.device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.model.to(self.device)
         t1 = time.perf_counter()
-        logger.info(f"YOLO model loaded on {self.device} in {(t1-t0)*1000:.0f}ms")
+        self.load_time_ms = round((t1 - t0) * 1000, 1)
+        logger.info(f"YOLO model loaded on {self.device} in {self.load_time_ms:.0f}ms")
     def predict(self, frame: np.ndarray, conf_threshold: float = 0.25) -> dict:
         """Run YOLO inference, return dict matching OpenCVPoseModel.predict() format."""
+        t0 = time.perf_counter()
         results = self.model(frame, verbose=False, conf=conf_threshold)
         if results[0].keypoints is not None and len(results[0].keypoints.xy) > 0:
             kps = results[0].keypoints.xy[0].cpu().numpy().astype(np.float32)
@@ -41,4 +43,5 @@ class UltralyticsYOLOModel:
             confs = np.zeros(17, dtype=np.float32)
             bbox = (0, 0, 0, 0)
             score = 0.0
+        self._last_predict_ms = round((time.perf_counter() - t0) * 1000, 2)
         return {"keypoints": kps, "confidences": confs, "bbox": bbox, "score": score}

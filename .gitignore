@@ -21,3 +21,6 @@ services/cv-engine/.env
 
 # OS
 .DS_Store
+
+# Wrangler cache/state
+.wrangler/

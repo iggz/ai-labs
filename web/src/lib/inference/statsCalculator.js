@@ -54,15 +54,18 @@ export function computeStats(repCounter, allAngles, allConfidences, durationSec,
       depth_score_pct: null,
       letter_grade: null,
       form_label: 'No reps detected',
-      avg_rep_angle: null,
-      min_rep_angle: null,
-      max_rep_angle: null,
+      avg_primary_angle: null,
+      best_rep_angle: null,
+      worst_rep_angle: null,
+      angle_std_dev: null,
+      per_rep_angles: null,
       avg_confidence: null,
       reps_per_minute: null,
       // Server-only fields — not available on-device
       symmetry_score: null,
       symmetry_label: null,
       tempo_avg_sec: null,
+      tempo_sec_per_rep: null,
       per_rep_phases: null,
     };
   }
@@ -92,19 +95,36 @@ export function computeStats(repCounter, allAngles, allConfidences, durationSec,
     ? Math.round((repCount / durationSec) * 60 * 10) / 10
     : null;
 
+  // Angle std deviation (for consistency card)
+  let angleStdDev = null;
+  if (perRepAngles.length > 1) {
+    const mean = avgExtremum;
+    const variance = perRepAngles.reduce((sum, a) => sum + (a - mean) ** 2, 0) / perRepAngles.length;
+    angleStdDev = Math.round(Math.sqrt(variance) * 10) / 10;
+  } else if (perRepAngles.length === 1) {
+    angleStdDev = 0;
+  }
+
+  // Best/worst rep angle (matching server field names)
+  const bestRepAngle = exerciseType === 'squat' ? minExtremum : maxExtremum;
+  const worstRepAngle = exerciseType === 'squat' ? maxExtremum : minExtremum;
+
   return {
     depth_score_pct: depthPct,
     letter_grade: scoreToGrade(depthPct),
     form_label: scoreToFormLabel(depthPct, exerciseType),
-    avg_rep_angle: Math.round(avgExtremum * 10) / 10,
-    min_rep_angle: Math.round(minExtremum * 10) / 10,
-    max_rep_angle: Math.round(maxExtremum * 10) / 10,
+    avg_primary_angle: Math.round(avgExtremum * 10) / 10,
+    best_rep_angle: Math.round(bestRepAngle * 10) / 10,
+    worst_rep_angle: Math.round(worstRepAngle * 10) / 10,
+    angle_std_dev: angleStdDev,
+    per_rep_angles: perRepAngles.map(a => Math.round(a * 10) / 10),
     avg_confidence: avgConf !== null ? Math.round(avgConf * 1000) / 1000 : null,
     reps_per_minute: repsPerMin,
     // Server-only fields — null on-device
     symmetry_score: null,
     symmetry_label: null,
     tempo_avg_sec: null,
+    tempo_sec_per_rep: null,
     per_rep_phases: null,
   };
 }
