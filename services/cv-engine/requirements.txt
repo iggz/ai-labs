@@ -13,3 +13,4 @@ pytest-asyncio==0.25.3
 python-dotenv==1.2.2
 # CoreML inference on Apple Silicon (Mac-only; no-op on Windows/Linux)
 coremltools>=8.0
+imageio-ffmpeg>=0.4.9
