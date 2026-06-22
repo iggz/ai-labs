@@ -8,6 +8,10 @@
 /* ── Page layout ──────────────────────────────────────────────────────────── */
 .benchmark-page {
   min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: var(--cv-bg, #0f0f13);
   color: var(--cv-text, #e2e8f0);
   padding: 0 0 6rem;
