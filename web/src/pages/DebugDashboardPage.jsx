@@ -103,7 +103,7 @@ async function deleteLogEntry(key) {
 // ── Default filter state ─────────────────────────────────────────────────────
 
 const DEFAULT_FILTERS = {
-  methods: ['dnn', 'yolo', 'on-device'],
+  methods: ['dnn', 'dml', 'yolo', 'cuda', 'on-device'],
   exerciseType: '',
   dateFrom: '',
   dateTo: '',

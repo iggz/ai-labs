@@ -21,6 +21,11 @@
  * → GET  /api/debug-batches         — List Test All batches
  * → GET  /api/debug-batch/:id       — Get a batch with all run data
  * → POST /api/debug-batch           — Create/update a batch
+ *
+ * Benchmark API:
+ * → GET /api/benchmarks             — Query cv_analyses from Supabase for benchmark comparison
+ *   Params: limit (max 500), protocol (comma-separated: dml,yolo,cuda)
+ *   Requires Worker secrets: SUPABASE_URL, SUPABASE_ANON_KEY
  */
 
 const GITHUB_MODEL_URL =
@@ -384,6 +389,64 @@ export default {
         return jsonResponse({ ok: true, batch_number: batchNumber, key: batchKey });
       } catch (err) {
         return jsonResponse({ ok: false, error: err.message }, 500);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── Benchmark API — reads cv_analyses from Supabase ──
+    // ══════════════════════════════════════════════════════════════════════
+    // GET /api/benchmarks?limit=200&protocol=dml,yolo,cuda
+    // Returns the most recent N completed jobs with audit fields.
+    // Uses the Supabase anon key — only selects non-biometric columns.
+    if (path === '/api/benchmarks' && request.method === 'GET') {
+      try {
+        const supabaseUrl = env.SUPABASE_URL;
+        const supabaseKey = env.SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseKey) {
+          return jsonResponse({ error: 'Supabase credentials not configured' }, 500);
+        }
+
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '200', 10), 500);
+        const protocolParam = url.searchParams.get('protocol');
+        const protocols = protocolParam?.split(',').map(p => p.trim()).filter(Boolean);
+
+        // Build the PostgREST query URL manually (no SDK needed in Workers)
+        const cols = [
+          'id', 'created_at', 'protocol', 'machine_id', 'machine_hostname',
+          'inference_backend', 'processing_time_ms', 'queue_wait_ms',
+          'file_size_bytes', 'camera_angle', 'build_hash',
+        ].join(',');
+
+        let queryUrl = `${supabaseUrl}/rest/v1/cv_analyses?select=${cols}`;
+
+        // Filter: only rows where protocol IS NOT NULL
+        queryUrl += `&protocol=not.is.null`;
+
+        // Optional protocol filter
+        if (protocols?.length) {
+          queryUrl += `&protocol=in.(${protocols.join(',')})`;
+        }
+
+        queryUrl += `&order=created_at.desc&limit=${limit}`;
+
+        const sbRes = await fetch(queryUrl, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!sbRes.ok) {
+          const errText = await sbRes.text();
+          return jsonResponse({ error: `Supabase error: ${errText}` }, sbRes.status);
+        }
+
+        const rows = await sbRes.json();
+        return jsonResponse(rows || []);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
       }
     }
 

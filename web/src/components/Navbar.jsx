@@ -12,7 +12,7 @@
 
 import { useRef, useState } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Activity, Film, Ruler, Settings, Home, X, BarChart } from 'lucide-react';
+import { Activity, Film, Ruler, Settings, Home, X, BarChart, Zap } from 'lucide-react';
 import { getApiBase } from '../lib/cvApi';
 import './Navbar.css';
 
@@ -290,15 +290,28 @@ export function Navbar() {
             <p className="settings-modal__help">
               View analytics and telemetry data for historical runs across all inference methods.
             </p>
-            <Link
-              to="/debug/dashboard"
-              className="btn btn--ghost btn--sm"
-              onClick={closeSettings}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
-            >
-              <BarChart size={16} aria-hidden="true" />
-              Open Telemetry Dashboard
-            </Link>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Link
+                to="/debug/dashboard"
+                className="btn btn--ghost btn--sm"
+                onClick={closeSettings}
+                id="settings-telemetry-link"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+              >
+                <BarChart size={16} aria-hidden="true" />
+                Open Telemetry Dashboard
+              </Link>
+              <Link
+                to="/benchmark"
+                className="btn btn--ghost btn--sm"
+                onClick={closeSettings}
+                id="settings-benchmark-link"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+              >
+                <Zap size={16} aria-hidden="true" />
+                Benchmark Dashboard
+              </Link>
+            </div>
           </section>
         </div>
       </dialog>

@@ -51,11 +51,12 @@ _opencv_model  = None
 _yolo_model    = None
 _dml_model     = None
 _coreml_model  = None
+_cuda_model    = None
 
 
 def _get_pose_model(protocol: str = "opencv"):
     """Lazy-load and cache the requested inference backend."""
-    global _opencv_model, _yolo_model, _dml_model, _coreml_model
+    global _opencv_model, _yolo_model, _dml_model, _coreml_model, _cuda_model
     if protocol == "opencv":
         if _opencv_model is None:
             _opencv_model = OpenCVPoseModel("yolov8s-pose.onnx")
@@ -80,6 +81,13 @@ def _get_pose_model(protocol: str = "opencv"):
             _dml_model = DMLPoseModel("yolov8s-pose.onnx")
             logger.info(f"DirectML model loaded on: {_dml_model.device}")
         return _dml_model
+    elif protocol == "cuda":
+        if _cuda_model is None:
+            raise NotImplementedError(
+                "CUDA backend not yet available on this machine. "
+                "Deploy cv-engine on the NVIDIA laptop to enable this protocol."
+            )
+        return _cuda_model
     else:
         raise ValueError(f"Unknown protocol: {protocol}")
 

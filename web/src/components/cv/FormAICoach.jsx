@@ -56,9 +56,9 @@ const CAMERA_ANGLE_GUIDANCE = {
 };
 
 const PROTOCOLS = [
-  { id: 'opencv',    label: 'DNN'       },
-  { id: 'dml',       label: 'DirectML'  },
-  { id: 'yolo',      label: 'YOLO'      },
+  { id: 'dml',       label: '⚡⚡ DirectML', accent: true },
+  { id: 'yolo',      label: 'Metal'     },
+  { id: 'cuda',      label: 'CUDA',       disabled: true, tooltip: 'Coming soon — NVIDIA RTX 2060' },
   { id: 'on-device', label: 'On Device' },
 ];
 
@@ -177,7 +177,7 @@ function ConfigureAndUploadStep({
         <div className="formai-configure__label-row">
           <span className="formai-configure__section-label">Processing</span>
           <InfoPopover id="info-protocol">
-            <p><strong>DNN</strong> — OpenCV-based, fastest, good for well-lit videos.<br /><strong>DirectML</strong> — GPU accelerated inference on Windows (AMD/Intel/Nvidia).<br /><strong>YOLO</strong> — Best accuracy, recommended for most users.<br /><strong>On Device</strong> — Routes privately through YOLO in Phase 1; full local inference in Phase 2.</p>
+            <p><strong>⚡⚡ DirectML</strong> — AMD RX 7800 XT, fastest server processing.<br /><strong>Metal</strong> — Apple M4 Pro, CoreML Neural Engine acceleration.<br /><strong>CUDA</strong> — NVIDIA RTX 2060 (coming soon).<br /><strong>On Device</strong> — Runs privately in your browser, no upload needed. Speed depends on your device GPU.</p>
           </InfoPopover>
         </div>
         <div className="formai-segmented" role="radiogroup" aria-label="Processing protocol">
@@ -188,8 +188,10 @@ function ConfigureAndUploadStep({
               type="button"
               role="radio"
               aria-checked={protocol === opt.id}
-              className={`formai-segmented__btn ${protocol === opt.id ? 'active' : ''} ${opt.id === 'on-device' ? 'formai-segmented__btn--on-device' : ''}`}
-              onClick={() => handleProtocolChange(opt.id)}
+              disabled={opt.disabled}
+              title={opt.tooltip || ''}
+              className={`formai-segmented__btn ${protocol === opt.id ? 'active' : ''} ${opt.id === 'on-device' ? 'formai-segmented__btn--on-device' : ''} ${opt.accent ? 'formai-segmented__btn--accent' : ''} ${opt.disabled ? 'formai-segmented__btn--disabled' : ''}`}
+              onClick={() => !opt.disabled && handleProtocolChange(opt.id)}
             >
               {opt.label}
             </button>
@@ -829,7 +831,7 @@ export function FormAICoach() {
   const [exercise,    setExerciseRaw]    = useState(() => loadPref('hhb_exercise',     'squat'));
   const [cameraAngle, setCameraAngleRaw] = useState(() => loadPref('hhb_camera_angle', 'auto'));
   const [overlayMode, setOverlayModeRaw] = useState(() => loadPref('hhb_overlay_mode', 'full'));
-  const [protocol,    setProtocolRaw]    = useState(() => loadPref('hhb_protocol',     'opencv'));
+  const [protocol,    setProtocolRaw]    = useState(() => loadPref('hhb_protocol',     'dml'));
 
   const setExercise    = useCallback(v => { savePref('hhb_exercise',     v); setExerciseRaw(v);    }, []);
   const setCameraAngle = useCallback(v => { savePref('hhb_camera_angle', v); setCameraAngleRaw(v); }, []);
@@ -856,7 +858,8 @@ export function FormAICoach() {
     // ── Unified debug telemetry (all methods) ──────────────────────────
     const debugMethod = protocol === 'on-device' ? 'on-device'
                       : protocol === 'yolo' ? 'yolo'
-                      : protocol === 'dml' ? 'dml' : 'dnn';
+                      : protocol === 'dml' ? 'dml'
+                      : protocol === 'cuda' ? 'cuda' : 'dnn';
     const debugLogger = DEBUG_ENABLED
       ? new UnifiedDebugLogger(debugMethod, exerciseType, cameraAngle)
       : null;

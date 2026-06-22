@@ -191,6 +191,7 @@ app.add_middleware(
         "https://ilovetoridemybicycle.com",
         "https://www.ilovetoridemybicycle.com",
         "https://api-mac.ilovetoridemybicycle.com",
+        "https://api-cuda.ilovetoridemybicycle.com",
         "https://heather-holly-body.vercel.app",
         "https://heatherhollybody.vercel.app",
         "https://ai-labs.ipopenov.workers.dev",
@@ -392,8 +393,8 @@ async def analyze_form(
         raise HTTPException(422, "exercise_type must be squat, deadlift, hip_thrust, or auto")
     if overlay_mode not in ("full", "minimal"):
         raise HTTPException(422, "overlay_mode must be 'full' or 'minimal'")
-    if protocol not in ("opencv", "yolo", "dml"):
-        raise HTTPException(422, "protocol must be 'opencv', 'yolo', or 'dml'")
+    if protocol not in ("opencv", "yolo", "dml", "cuda"):
+        raise HTTPException(422, "protocol must be 'opencv', 'yolo', 'dml', or 'cuda'")
 
     # Capture routing audit fields from request headers
     client_ip  = request.headers.get("CF-Connecting-IP") or request.client.host

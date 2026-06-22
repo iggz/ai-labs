@@ -5,9 +5,10 @@
  * Communicates with the FastAPI CV engine via Cloudflare Tunnels.
  *
  * Multi-device routing (production):
- *   yolo    → https://api-mac.ilovetoridemybicycle.com  (Mac, CoreML/ANE)
- *   dml     → https://api.ilovetoridemybicycle.com      (PC, AMD DirectML)
- *   opencv  → https://api.ilovetoridemybicycle.com      (PC, default)
+ *   dml    → https://api.ilovetoridemybicycle.com       (PC Tower, AMD DirectML — default)
+ *   yolo   → https://api-mac.ilovetoridemybicycle.com   (Mac, CoreML / Metal M4 Pro)
+ *   cuda   → https://api-cuda.ilovetoridemybicycle.com  (Laptop, NVIDIA CUDA — coming soon)
+ *   opencv → https://api.ilovetoridemybicycle.com       (PC Tower, OpenCV DNN fallback)
  *
  * Developer override: set localStorage key 'AILABS_CV_API_URL' to redirect
  * all protocols to a local or staging host (takes priority over everything).
@@ -17,11 +18,12 @@
  *   Passes `debug=1` to the server so it returns debug_timings.
  */
 
-// ── Production routing table ──────────────────────────────────────────────────
+// ── Production routing table ───────────────────────────────────────────────────
 const PROTOCOL_HOSTS = {
-  yolo:   'https://api-mac.ilovetoridemybicycle.com',  // Mac — CoreML / ANE
-  dml:    'https://api.ilovetoridemybicycle.com',      // PC  — AMD DirectML
-  opencv: 'https://api.ilovetoridemybicycle.com',      // PC  — OpenCV DNN (default)
+  dml:    'https://api.ilovetoridemybicycle.com',       // PC Tower — AMD DirectML (RX 7800 XT)
+  yolo:   'https://api-mac.ilovetoridemybicycle.com',   // Mac — CoreML / Metal (M4 Pro)
+  cuda:   'https://api-cuda.ilovetoridemybicycle.com',  // Laptop — NVIDIA CUDA (RTX 2060) — coming soon
+  opencv: 'https://api.ilovetoridemybicycle.com',       // PC Tower — OpenCV DNN (fallback)
 };
 
 /**
@@ -33,14 +35,14 @@ export function getApiBase() {
     const custom = localStorage.getItem('AILABS_CV_API_URL');
     if (custom) return custom.trim().replace(/\/$/, '');
   }
-  return import.meta.env.VITE_CV_API_URL || 'http://localhost:8080';
+  return import.meta.env.VITE_CV_API_URL || PROTOCOL_HOSTS.dml;
 }
 
 /**
  * Returns the API base URL for a specific inference protocol.
  * Priority: localStorage override > VITE_CV_API_URL env > protocol routing table.
  *
- * @param {string} protocol — 'yolo' | 'dml' | 'opencv' | 'on-device'
+ * @param {string} protocol — 'dml' | 'yolo' | 'cuda' | 'opencv' | 'on-device'
  */
 export function getApiBaseForProtocol(protocol) {
   // 1. Developer override always wins (covers all protocols)

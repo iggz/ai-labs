@@ -16,8 +16,9 @@ import SlingShotPage from './pages/SlingShotPage';
 import SmartFitPage from './pages/SmartFitPage';
 
 // Debug routes — lazy-loaded (only imported when accessed)
-const DebugComparePage = lazy(() => import('./pages/DebugComparePage'));
+const DebugComparePage   = lazy(() => import('./pages/DebugComparePage'));
 const DebugDashboardPage = lazy(() => import('./pages/DebugDashboardPage'));
+const BenchmarkPage      = lazy(() => import('./pages/BenchmarkPage'));
 
 export default function App() {
   return (
@@ -48,6 +49,15 @@ export default function App() {
               </div>
             }>
               <DebugDashboardPage />
+            </Suspense>
+          } />
+          <Route path="/benchmark" element={
+            <Suspense fallback={
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: '#94a3b8' }}>
+                Loading benchmarks…
+              </div>
+            }>
+              <BenchmarkPage />
             </Suspense>
           } />
         </Routes>
