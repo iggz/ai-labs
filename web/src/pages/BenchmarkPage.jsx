@@ -21,10 +21,9 @@ import '../components/benchmark/benchmark.css';
 // ── API helper ────────────────────────────────────────────────────────────────
 async function fetchBenchmarks(limit = 200) {
   // The Cloudflare Worker exposes /api/benchmarks which reads from Supabase.
-  // In production the worker is at the same origin as the app.
-  // In development (localhost) we fall back to the production Worker URL.
+  // The app is served at /ai-labs/ so we need that prefix in production too.
   const workerBase = import.meta.env.PROD
-    ? ''  // same origin in production
+    ? `${import.meta.env.BASE_URL.replace(/\/$/, '')}`  // '/ai-labs' in production
     : 'https://ilovetoridemybicycle.com/ai-labs';
 
   const url = `${workerBase}/api/benchmarks?limit=${limit}`;
