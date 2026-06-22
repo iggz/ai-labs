@@ -18,6 +18,7 @@ Privacy:
 """
 
 import os
+import sys
 import socket
 import logging
 import tempfile
@@ -43,12 +44,33 @@ from form_ai import process_form_ai
 from slingshot import process_slingshot
 from smartfit import process_smartfit
 
+# ── Machine Identity (auto-detected — NOT from .env) ─────────────────────────
+# Derived purely from runtime signals so it can never be wrong due to a
+# misconfigured env file. Three checkpoints confirm identity:
+#   [1] Startup  — hostname + platform + Python env
+#   [2] Model load — which model class actually initialised
+#   [3] DB write  — backend stamped on every cv_analyses row
+MACHINE_HOSTNAME = socket.gethostname()
+_platform        = sys.platform  # 'darwin', 'win32', 'linux'
+
+_HOSTNAME_TO_ID: dict[str, str] = {
+    "mac.lan":        "mac",
+    "DESKTOP-4V907DI": "pc",
+}
+MACHINE_ID = _HOSTNAME_TO_ID.get(MACHINE_HOSTNAME, MACHINE_HOSTNAME)
+
+# INFERENCE_BACKEND starts as 'pending' and is updated to the real value
+# by form_ai._get_pose_model() the first time a model loads. This ensures
+# the DB always records what truly ran — not what .env hoped would run.
+INFERENCE_BACKEND = "pending"   # resolved at first model load
+
+_SERVER_START_TIME = _time.time()
+
 # ── Logging ─────────────────────────────────────────────────────────────────
 # Structured logging with ISO-8601 timestamps so log lines can be cross-
 # referenced with DB created_at / updated_at timestamps.
-_MACHINE_ID_FOR_LOG = os.environ.get("MACHINE_ID", "unknown")
 _log_formatter = logging.Formatter(
-    fmt=f'%(asctime)s [%(levelname)s] [machine={_MACHINE_ID_FOR_LOG}] %(name)s: %(message)s',
+    fmt=f'%(asctime)s [%(levelname)s] [machine={MACHINE_ID}] %(name)s: %(message)s',
     datefmt='%Y-%m-%dT%H:%M:%S',
 )
 _log_handler = logging.StreamHandler()
@@ -57,8 +79,6 @@ logging.basicConfig(level=logging.INFO, handlers=[_log_handler], force=True)
 logger = logging.getLogger(__name__)
 
 # ── Local Debug Configuration ─────────────────────────────────────────────────
-# Set to True to copy all processed videos to a local debug folder.
-# This folder is ignored in git and is for developer test capture.
 SAVE_LOCAL_DEBUG_VIDEOS = os.environ.get("SAVE_DEBUG_VIDEOS", "false").lower() == "true"
 
 # ── Supabase Client ───────────────────────────────────────────────────────────
@@ -68,24 +88,29 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_SERVICE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    logger.info("Supabase client initialized")
 else:
     logger.warning("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set — DB writes disabled")
 
-# ── Machine Identity ──────────────────────────────────────────────────────────
-# Set MACHINE_ID in .env to 'mac' or 'pc'. Written to every cv_analyses row
-# so you can audit which machine processed each job from the database.
-MACHINE_ID        = os.environ.get("MACHINE_ID", "unknown")
-MACHINE_HOSTNAME  = socket.gethostname()
-INFERENCE_BACKEND = os.environ.get("INFERENCE_BACKEND", "opencv_dnn")
-_SERVER_START_TIME = _time.time()
-logger.info(
-    f"Machine identity — id={MACHINE_ID} hostname={MACHINE_HOSTNAME} "
-    f"backend={INFERENCE_BACKEND}"
-)
-
 # ── Job Queue ─────────────────────────────────────────────────────────────────
 job_queue = CVJobQueue()
+
+
+def _checkpoint(tag: str, extra: str = "") -> None:
+    """Emit a structured identity checkpoint log line.
+
+    Fires at:
+      [STARTUP]     — process boot, before any requests
+      [MODEL_LOAD]  — first time a model class instantiates (resolves INFERENCE_BACKEND)
+      [JOB_SUBMIT]  — incoming FormAI request received
+      [DB_WRITE]    — just before the Supabase INSERT
+    """
+    msg = (
+        f"[{tag}] machine={MACHINE_ID} hostname={MACHINE_HOSTNAME} "
+        f"platform={_platform} backend={INFERENCE_BACKEND}"
+    )
+    if extra:
+        msg += f" | {extra}"
+    logger.info(msg)
 
 
 @asynccontextmanager
@@ -95,6 +120,7 @@ async def lifespan(app: FastAPI):
     job_queue.register_processor("slingshot", _process_slingshot_with_upload)
     job_queue.register_processor("smartfit", process_smartfit)
     await job_queue.start_worker()
+    _checkpoint("STARTUP", f"supabase={'ok' if supabase else 'MISSING'}")
     logger.info("CV Engine worker started")
     yield
     await job_queue.stop_worker()
@@ -336,6 +362,7 @@ async def _record_analysis(
     record.update({k: v for k, v in audit.items() if v is not None})
 
     try:
+        _checkpoint("DB_WRITE", f"protocol={protocol} proc_ms={processing_time_ms}")
         resp = supabase.table("cv_analyses").insert(record).execute()
         if resp.data:
             analysis_id = resp.data[0]["id"]
@@ -409,6 +436,7 @@ async def analyze_form(
         f"FormAI submit — protocol={protocol} exercise={exercise_type} "
         f"size_bytes={len(video_bytes)} client_ip={client_ip} build={build_hash}"
     )
+    _checkpoint("JOB_SUBMIT", f"protocol={protocol} exercise={exercise_type}")
 
     try:
         job = await job_queue.submit("form_ai", {

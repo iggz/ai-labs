@@ -55,12 +55,19 @@ _cuda_model    = None
 
 
 def _get_pose_model(protocol: str = "opencv"):
-    """Lazy-load and cache the requested inference backend."""
+    """Lazy-load and cache the requested inference backend.
+
+    Also resolves main.INFERENCE_BACKEND to the real model class on first load
+    so the DB always records what actually ran.
+    """
+    import main as _main  # local import avoids circular import at module level
     global _opencv_model, _yolo_model, _dml_model, _coreml_model, _cuda_model
     if protocol == "opencv":
         if _opencv_model is None:
             _opencv_model = OpenCVPoseModel("yolov8s-pose.onnx")
+            _main.INFERENCE_BACKEND = "opencv_dnn"
             logger.info(f"OpenCV DNN model loaded on: {_opencv_model.device}")
+            _main._checkpoint("MODEL_LOAD", f"class=OpenCVPoseModel device={_opencv_model.device}")
         return _opencv_model
     elif protocol == "yolo":
         if _yolo_model is None:
@@ -68,18 +75,24 @@ def _get_pose_model(protocol: str = "opencv"):
                 # macOS Apple Silicon → CoreML / Apple Neural Engine
                 from coreml_pose import CoreMLPoseModel
                 _yolo_model = CoreMLPoseModel("yolov8s-pose.mlpackage")
+                _main.INFERENCE_BACKEND = "coreml"
                 logger.info(f"CoreML model loaded on: {_yolo_model.device}")
+                _main._checkpoint("MODEL_LOAD", f"class=CoreMLPoseModel device={_yolo_model.device}")
             else:
-                # Windows / Linux → Ultralytics + PyTorch (MPS or CPU)
+                # Windows / Linux → Ultralytics + PyTorch (GPU or CPU)
                 from yolo_pose import UltralyticsYOLOModel
                 _yolo_model = UltralyticsYOLOModel("yolov8s-pose.pt")
+                _main.INFERENCE_BACKEND = "ultralytics_yolo"
                 logger.info(f"Ultralytics YOLO model loaded on: {_yolo_model.device}")
+                _main._checkpoint("MODEL_LOAD", f"class=UltralyticsYOLOModel device={_yolo_model.device}")
         return _yolo_model
     elif protocol == "dml":
         if _dml_model is None:
             from dml_pose import DMLPoseModel
             _dml_model = DMLPoseModel("yolov8s-pose.onnx")
+            _main.INFERENCE_BACKEND = "directml"
             logger.info(f"DirectML model loaded on: {_dml_model.device}")
+            _main._checkpoint("MODEL_LOAD", f"class=DMLPoseModel device={_dml_model.device}")
         return _dml_model
     elif protocol == "cuda":
         if _cuda_model is None:
