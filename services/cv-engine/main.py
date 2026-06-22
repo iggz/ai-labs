@@ -518,77 +518,93 @@ async def get_job_status(job_id: str):
     if job.status == "completed":
         result = job.result or {}
 
-        # For FormAI: persist to DB and strip annotated bytes from response
+        # For FormAI: persist to DB and strip annotated bytes from response.
+        # Guard with db_written so we only insert once — the frontend polls
+        # multiple times while waiting, which would otherwise create duplicate rows.
         if job.payload.get("exercise_type"):
-            metadata = result.get("metadata", {})
-            signed_url = None
+            if job.db_written and job.cached_poll_result is not None:
+                # Already written on a previous poll — return the cached result
+                response["result"] = job.cached_poll_result
+            else:
+                metadata = result.get("metadata", {})
+                signed_url = None
 
-            annotated_bytes = result.get("annotated_video_bytes")
-            if annotated_bytes:
-                object_name = f"form-ai/{job.id}.mp4"
-                signed_url = await _upload_to_supabase_storage(
-                    annotated_bytes,
-                    object_name,
-                    exercise_type=job.payload.get("exercise_type")
+                annotated_bytes = result.get("annotated_video_bytes")
+                if annotated_bytes:
+                    object_name = f"form-ai/{job.id}.mp4"
+                    signed_url = await _upload_to_supabase_storage(
+                        annotated_bytes,
+                        object_name,
+                        exercise_type=job.payload.get("exercise_type")
+                    )
+
+                # Compute timing metrics from job lifecycle timestamps
+                process_ms = (
+                    round((job.completed_at - job.started_at) * 1000)
+                    if job.completed_at and job.started_at else None
+                )
+                queue_ms = (
+                    round((job.started_at - job.created_at) * 1000)
+                    if job.started_at and job.created_at else None
                 )
 
-            # Compute timing metrics from job lifecycle timestamps
-            process_ms = (
-                round((job.completed_at - job.started_at) * 1000)
-                if job.completed_at and job.started_at else None
-            )
-            queue_ms = (
-                round((job.started_at - job.created_at) * 1000)
-                if job.started_at and job.created_at else None
-            )
+                analysis_id = await _record_analysis(
+                    "form_ai",
+                    metadata,
+                    signed_url,
+                    job.payload.get("consent_token", ""),
+                    user_id=job.payload.get("user_id"),
+                    # Routing audit fields
+                    protocol=job.payload.get("protocol"),
+                    camera_angle=job.payload.get("camera_angle"),
+                    machine_id=MACHINE_ID,
+                    machine_hostname=MACHINE_HOSTNAME,
+                    inference_backend=INFERENCE_BACKEND,
+                    processing_time_ms=process_ms,
+                    queue_wait_ms=queue_ms,
+                    file_size_bytes=job.payload.get("file_size_bytes"),
+                    client_ip=job.payload.get("client_ip"),
+                    build_hash=job.payload.get("build_hash"),
+                )
+                poll_result = {
+                    "analysis_id": analysis_id,
+                    "signed_url": signed_url,
+                    "metadata": metadata,
+                    "processing_log": result.get("processing_log", {}),
+                }
+                # Include debug_timings if the processor returned them
+                debug_timings = result.get("debug_timings")
+                if debug_timings:
+                    poll_result["debug_timings"] = debug_timings
 
-            analysis_id = await _record_analysis(
-                "form_ai",
-                metadata,
-                signed_url,
-                job.payload.get("consent_token", ""),
-                user_id=job.payload.get("user_id"),
-                # Routing audit fields
-                protocol=job.payload.get("protocol"),
-                camera_angle=job.payload.get("camera_angle"),
-                machine_id=MACHINE_ID,
-                machine_hostname=MACHINE_HOSTNAME,
-                inference_backend=INFERENCE_BACKEND,
-                processing_time_ms=process_ms,
-                queue_wait_ms=queue_ms,
-                file_size_bytes=job.payload.get("file_size_bytes"),
-                client_ip=job.payload.get("client_ip"),
-                build_hash=job.payload.get("build_hash"),
-            )
-            response["result"] = {
-                "analysis_id": analysis_id,
-                "signed_url": signed_url,
-                "metadata": metadata,
-                "processing_log": result.get("processing_log", {}),
-            }
-            # Include debug_timings if the processor returned them
-            debug_timings = result.get("debug_timings")
-            if debug_timings:
-                response["result"]["debug_timings"] = debug_timings
+                # Cache so subsequent polls don't re-insert
+                job.cached_poll_result = poll_result
+                job.db_written = True
+                response["result"] = poll_result
 
-
-        # For SlingShot
+        # For SlingShot — same guard
         elif "stats" in result or "signed_url" in result:
-            stats = result.get("stats", {})
-            signed_url = result.get("signed_url")
+            if job.db_written and job.cached_poll_result is not None:
+                response["result"] = job.cached_poll_result
+            else:
+                stats = result.get("stats", {})
+                signed_url = result.get("signed_url")
 
-            analysis_id = await _record_analysis(
-                "slingshot",
-                {"duration_sec": stats.get("total_frames", 0) / 30, "tracking_type": "barbell"},
-                signed_url,
-                job.payload.get("consent_token", ""),
-                email_hash=job.payload.get("email_hash"),
-            )
-            response["result"] = {
-                "analysis_id": analysis_id,
-                "signed_url": signed_url,
-                "stats": stats,
-            }
+                analysis_id = await _record_analysis(
+                    "slingshot",
+                    {"duration_sec": stats.get("total_frames", 0) / 30, "tracking_type": "barbell"},
+                    signed_url,
+                    job.payload.get("consent_token", ""),
+                    email_hash=job.payload.get("email_hash"),
+                )
+                poll_result = {
+                    "analysis_id": analysis_id,
+                    "signed_url": signed_url,
+                    "stats": stats,
+                }
+                job.cached_poll_result = poll_result
+                job.db_written = True
+                response["result"] = poll_result
 
         # For SmartFit: return directly, NO DB record
         else:

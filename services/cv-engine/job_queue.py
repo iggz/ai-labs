@@ -41,6 +41,9 @@ class Job:
     started_at: Optional[float] = None
     completed_at: Optional[float] = None
     position_in_queue: int = 0
+    # ── Set after first completed poll to prevent duplicate DB inserts ──────
+    db_written: bool = False
+    cached_poll_result: Optional[dict] = None  # frozen response after first write
 
 
 class CVJobQueue:
