@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true
+  }
+}

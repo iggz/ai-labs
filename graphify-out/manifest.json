@@ -1,0 +1,442 @@
+{
+  "build_frontend.ps1": {
+    "mtime": 1782073018.0,
+    "ast_hash": "99bd886eaa26db3200565fbdab7728e9",
+    "semantic_hash": "99bd886eaa26db3200565fbdab7728e9"
+  },
+  "install_tools.ps1": {
+    "mtime": 1782073018.0,
+    "ast_hash": "1c7b682ed13b6199a1e78c991038b968",
+    "semantic_hash": "1c7b682ed13b6199a1e78c991038b968"
+  },
+  "playwright.config.js": {
+    "mtime": 1782076185.7066705,
+    "ast_hash": "3523c61947f3a239e0b7f6b209dc2e6b",
+    "semantic_hash": "3523c61947f3a239e0b7f6b209dc2e6b"
+  },
+  "services/cv-engine/angle_utils.py": {
+    "mtime": 1781729845.0,
+    "ast_hash": "a08a445c6d0a840e846ce335dbf4dde1",
+    "semantic_hash": "a08a445c6d0a840e846ce335dbf4dde1"
+  },
+  "services/cv-engine/benchmark_acceleration.py": {
+    "mtime": 1782073018.0,
+    "ast_hash": "870836a5e9e78458198372a5c355c267",
+    "semantic_hash": "870836a5e9e78458198372a5c355c267"
+  },
+  "services/cv-engine/camera_angle.py": {
+    "mtime": 1781731831.0,
+    "ast_hash": "390cde0d7a5554a8caf6c98efc94c79c",
+    "semantic_hash": "390cde0d7a5554a8caf6c98efc94c79c"
+  },
+  "services/cv-engine/compress.py": {
+    "mtime": 1782073018.0,
+    "ast_hash": "7a683b46f1c719e5592eee3a0a847c74",
+    "semantic_hash": "7a683b46f1c719e5592eee3a0a847c74"
+  },
+  "services/cv-engine/coreml_pose.py": {
+    "mtime": 1782080469.1531792,
+    "ast_hash": "fc10e31b31b0abe83d37618d5bdf39be",
+    "semantic_hash": "fc10e31b31b0abe83d37618d5bdf39be"
+  },
+  "services/cv-engine/dml_pose.py": {
+    "mtime": 1782073018.0,
+    "ast_hash": "e1d617930ed2f2625b0c8135e26cc664",
+    "semantic_hash": "e1d617930ed2f2625b0c8135e26cc664"
+  },
+  "services/cv-engine/dnn_pose.py": {
+    "mtime": 1781891386.0,
+    "ast_hash": "ee7ce3936d8faa824f30c3899b3baded",
+    "semantic_hash": "ee7ce3936d8faa824f30c3899b3baded"
+  },
+  "services/cv-engine/encoding_utils.py": {
+    "mtime": 1789838596.7734566,
+    "ast_hash": "29d7283fdfc42f9d3833ea6edcb06a03",
+    "semantic_hash": ""
+  },
+  "services/cv-engine/exercise_classifier.py": {
+    "mtime": 1781731796.0,
+    "ast_hash": "fdf9771b80bfcddb957e4513a4fdb68d",
+    "semantic_hash": "fdf9771b80bfcddb957e4513a4fdb68d"
+  },
+  "services/cv-engine/export_coreml.py": {
+    "mtime": 1782073887.0,
+    "ast_hash": "48b7d3ab5ee810189eda9ebb5c8e7af5",
+    "semantic_hash": "48b7d3ab5ee810189eda9ebb5c8e7af5"
+  },
+  "services/cv-engine/export_onnx.py": {
+    "mtime": 1781759929.0,
+    "ast_hash": "2e4e72bb440ec2689685ae6a4f0d0e83",
+    "semantic_hash": "2e4e72bb440ec2689685ae6a4f0d0e83"
+  },
+  "services/cv-engine/ffmpeg_writer.py": {
+    "mtime": 1782073018.0,
+    "ast_hash": "9e609c80a11ac315059af759c00d4d0d",
+    "semantic_hash": "9e609c80a11ac315059af759c00d4d0d"
+  },
+  "services/cv-engine/form_ai.py": {
+    "mtime": 1789829341.7382536,
+    "ast_hash": "125de314051598ce1e51c2551ad59307",
+    "semantic_hash": ""
+  },
+  "services/cv-engine/job_queue.py": {
+    "mtime": 1782098075.8555744,
+    "ast_hash": "82eb46990c71b35a7570be17aa646265",
+    "semantic_hash": "82eb46990c71b35a7570be17aa646265"
+  },
+  "services/cv-engine/lens_correction.py": {
+    "mtime": 1781755383.0,
+    "ast_hash": "15fda8b69cc4c9873bfa96de18ec3559",
+    "semantic_hash": "15fda8b69cc4c9873bfa96de18ec3559"
+  },
+  "services/cv-engine/main.py": {
+    "mtime": 1789829322.272827,
+    "ast_hash": "73c955dda189d09e1bca08de06fb7476",
+    "semantic_hash": ""
+  },
+  "services/cv-engine/optical_flow_tracker.py": {
+    "mtime": 1781755383.0,
+    "ast_hash": "eff1acc01b9840f08bc49f631a1c31d2",
+    "semantic_hash": "eff1acc01b9840f08bc49f631a1c31d2"
+  },
+  "services/cv-engine/overlay.py": {
+    "mtime": 1781759175.0,
+    "ast_hash": "50b3e1c42ee57e3afcbed0f68ddc5b49",
+    "semantic_hash": "50b3e1c42ee57e3afcbed0f68ddc5b49"
+  },
+  "services/cv-engine/server_info.py": {
+    "mtime": 1781891375.0,
+    "ast_hash": "b9be2fa6ed88d0353f745dd1491c0e1c",
+    "semantic_hash": "b9be2fa6ed88d0353f745dd1491c0e1c"
+  },
+  "services/cv-engine/setup.sh": {
+    "mtime": 1781722677.0,
+    "ast_hash": "6e5995e285d9dccb85964d33e56ef6f5",
+    "semantic_hash": "6e5995e285d9dccb85964d33e56ef6f5"
+  },
+  "services/cv-engine/setup_win.ps1": {
+    "mtime": 1782073018.0,
+    "ast_hash": "ea23c0041732b3c266838da634c9cd6f",
+    "semantic_hash": "ea23c0041732b3c266838da634c9cd6f"
+  },
+  "services/cv-engine/slingshot.py": {
+    "mtime": 1781759189.0,
+    "ast_hash": "fd73c2e0a4f18b73f783c967aa811fde",
+    "semantic_hash": "fd73c2e0a4f18b73f783c967aa811fde"
+  },
+  "services/cv-engine/smartfit.py": {
+    "mtime": 1782073018.0,
+    "ast_hash": "106452d26b96042b9b1a4bf76da834f5",
+    "semantic_hash": "106452d26b96042b9b1a4bf76da834f5"
+  },
+  "services/cv-engine/smoother.py": {
+    "mtime": 1781466315.0,
+    "ast_hash": "6b6c54070ae29c318794394d992b3e49",
+    "semantic_hash": "6b6c54070ae29c318794394d992b3e49"
+  },
+  "services/cv-engine/yolo_pose.py": {
+    "mtime": 1781891386.0,
+    "ast_hash": "656003c614f0dfaefd8c3749cb064888",
+    "semantic_hash": "656003c614f0dfaefd8c3749cb064888"
+  },
+  "src/index.js": {
+    "mtime": 1782095085.270211,
+    "ast_hash": "4fafd736f6c7956f73c8237639761308",
+    "semantic_hash": "4fafd736f6c7956f73c8237639761308"
+  },
+  "web/eslint.config.js": {
+    "mtime": 1781827597.0,
+    "ast_hash": "3aa4b57d7f08181d86bde52a4dcb7f22",
+    "semantic_hash": "3aa4b57d7f08181d86bde52a4dcb7f22"
+  },
+  "web/playwright.config.js": {
+    "mtime": 1782076218.4393306,
+    "ast_hash": "3523c61947f3a239e0b7f6b209dc2e6b",
+    "semantic_hash": "3523c61947f3a239e0b7f6b209dc2e6b"
+  },
+  "web/src/App.jsx": {
+    "mtime": 1782094933.338374,
+    "ast_hash": "d51089a1d28f11dc92c7b406d0b83d55",
+    "semantic_hash": "d51089a1d28f11dc92c7b406d0b83d55"
+  },
+  "web/src/components/Navbar.jsx": {
+    "mtime": 1782094945.9936912,
+    "ast_hash": "aa943abf226b6c8730be9d4839642db4",
+    "semantic_hash": "aa943abf226b6c8730be9d4839642db4"
+  },
+  "web/src/components/benchmark/BenchmarkBarChart.jsx": {
+    "mtime": 1782094814.9108508,
+    "ast_hash": "66bacb4ad4201b6699710bd4f0ac1712",
+    "semantic_hash": "66bacb4ad4201b6699710bd4f0ac1712"
+  },
+  "web/src/components/benchmark/BenchmarkDetailCard.jsx": {
+    "mtime": 1782095122.843987,
+    "ast_hash": "e8d5ea55b54ab8a88c5af7ca9cb364d2",
+    "semantic_hash": "e8d5ea55b54ab8a88c5af7ca9cb364d2"
+  },
+  "web/src/components/benchmark/BenchmarkSummaryCards.jsx": {
+    "mtime": 1782094786.9482582,
+    "ast_hash": "f9e972131a2b5b06de072600bb89d0c6",
+    "semantic_hash": "f9e972131a2b5b06de072600bb89d0c6"
+  },
+  "web/src/components/benchmark/BenchmarkTable.jsx": {
+    "mtime": 1782095094.7570837,
+    "ast_hash": "4a775cb47a82244d76006767d684abd2",
+    "semantic_hash": "4a775cb47a82244d76006767d684abd2"
+  },
+  "web/src/components/benchmark/BenchmarkTimeline.jsx": {
+    "mtime": 1782094839.4778078,
+    "ast_hash": "2f0cd29ba687576b74db6b54a1ec46e0",
+    "semantic_hash": "2f0cd29ba687576b74db6b54a1ec46e0"
+  },
+  "web/src/components/cv/FeatureDisclosure.jsx": {
+    "mtime": 1781848759.0,
+    "ast_hash": "c97b207ffaba407e437707e41035804e",
+    "semantic_hash": "c97b207ffaba407e437707e41035804e"
+  },
+  "web/src/components/cv/FormAIAudioEngine.js": {
+    "mtime": 1781827806.0,
+    "ast_hash": "8ac1a46e2467a6a5b1cdcab4d1f04138",
+    "semantic_hash": "8ac1a46e2467a6a5b1cdcab4d1f04138"
+  },
+  "web/src/components/cv/FormAICoach.jsx": {
+    "mtime": 1782250566.0154142,
+    "ast_hash": "f2bcd04fa59350ac4751df7ce070bfdf",
+    "semantic_hash": ""
+  },
+  "web/src/components/cv/FormStatsDashboard.jsx": {
+    "mtime": 1782074099.0,
+    "ast_hash": "39d54c487472281410d332d3530788b5",
+    "semantic_hash": "39d54c487472281410d332d3530788b5"
+  },
+  "web/src/components/cv/InfoPopover.jsx": {
+    "mtime": 1781848307.0,
+    "ast_hash": "f30697eadf047f362019d4e8b3472fe1",
+    "semantic_hash": "f30697eadf047f362019d4e8b3472fe1"
+  },
+  "web/src/components/cv/SlingShotUploader.jsx": {
+    "mtime": 1781827806.0,
+    "ast_hash": "0994d72ae9d01653db13ca8940bd5954",
+    "semantic_hash": "0994d72ae9d01653db13ca8940bd5954"
+  },
+  "web/src/components/cv/SmartFitGuide.jsx": {
+    "mtime": 1781827835.0,
+    "ast_hash": "220a7a20a7e940b1f19f38c16f2a70db",
+    "semantic_hash": "220a7a20a7e940b1f19f38c16f2a70db"
+  },
+  "web/src/components/debug/AccuracyTable.jsx": {
+    "mtime": 1781893420.0,
+    "ast_hash": "bf8c251d078e8f225006dc77ee79ecda",
+    "semantic_hash": "bf8c251d078e8f225006dc77ee79ecda"
+  },
+  "web/src/components/debug/AngleHeatmap.jsx": {
+    "mtime": 1781893445.0,
+    "ast_hash": "5f7fc1451197f24d06f0dda35a387b84",
+    "semantic_hash": "5f7fc1451197f24d06f0dda35a387b84"
+  },
+  "web/src/components/debug/BatchExplorer.jsx": {
+    "mtime": 1781893496.0,
+    "ast_hash": "3a03e4d03d9d5009e960d859de0f769e",
+    "semantic_hash": "3a03e4d03d9d5009e960d859de0f769e"
+  },
+  "web/src/components/debug/BatteryImpact.jsx": {
+    "mtime": 1781893489.0,
+    "ast_hash": "dcf4651c620268a3683ff58ba051072d",
+    "semantic_hash": "dcf4651c620268a3683ff58ba051072d"
+  },
+  "web/src/components/debug/ConfidenceDrift.jsx": {
+    "mtime": 1781893475.0,
+    "ast_hash": "5e6f9ac5ce43f900b4d8a08777aeae15",
+    "semantic_hash": "5e6f9ac5ce43f900b4d8a08777aeae15"
+  },
+  "web/src/components/debug/CostAllocator.jsx": {
+    "mtime": 1781893533.0,
+    "ast_hash": "669de5926b79dc977306c27d8afc066b",
+    "semantic_hash": "669de5926b79dc977306c27d8afc066b"
+  },
+  "web/src/components/debug/DashboardFilters.jsx": {
+    "mtime": 1781893425.0,
+    "ast_hash": "1d70024ad1d9572385e4cd70bc011688",
+    "semantic_hash": "1d70024ad1d9572385e4cd70bc011688"
+  },
+  "web/src/components/debug/ExportControls.jsx": {
+    "mtime": 1781893496.0,
+    "ast_hash": "bd9e9cb994a848a57b0deb805e4f7b06",
+    "semantic_hash": "bd9e9cb994a848a57b0deb805e4f7b06"
+  },
+  "web/src/components/debug/LatencyPercentiles.jsx": {
+    "mtime": 1781893475.0,
+    "ast_hash": "6fe9d6001060e283bee7a5509342830a",
+    "semantic_hash": "6fe9d6001060e283bee7a5509342830a"
+  },
+  "web/src/components/debug/MemoryProfile.jsx": {
+    "mtime": 1781893472.0,
+    "ast_hash": "cf34d1c8e3aaa4fa0e9f8e7fa5f2e7bc",
+    "semantic_hash": "cf34d1c8e3aaa4fa0e9f8e7fa5f2e7bc"
+  },
+  "web/src/components/debug/NetworkWaterfall.jsx": {
+    "mtime": 1781893476.0,
+    "ast_hash": "6cc3b6430d177fb06397918841fa120b",
+    "semantic_hash": "6cc3b6430d177fb06397918841fa120b"
+  },
+  "web/src/components/debug/RegressionDetector.jsx": {
+    "mtime": 1781893532.0,
+    "ast_hash": "b68f072190b13f316867ff3a8a827be8",
+    "semantic_hash": "b68f072190b13f316867ff3a8a827be8"
+  },
+  "web/src/components/debug/RunHistoryTable.jsx": {
+    "mtime": 1781896157.0,
+    "ast_hash": "d72fcc871ec71eb50c8e5571d336e889",
+    "semantic_hash": "d72fcc871ec71eb50c8e5571d336e889"
+  },
+  "web/src/components/debug/ServerPhaseBreakdown.jsx": {
+    "mtime": 1781893450.0,
+    "ast_hash": "c99f117b6eece88010fe360e845180ab",
+    "semantic_hash": "c99f117b6eece88010fe360e845180ab"
+  },
+  "web/src/components/debug/SummaryCards.jsx": {
+    "mtime": 1781893466.0,
+    "ast_hash": "3a24d50f23a313e5d9300828942d7560",
+    "semantic_hash": "3a24d50f23a313e5d9300828942d7560"
+  },
+  "web/src/components/debug/ThermalIndicator.jsx": {
+    "mtime": 1781893488.0,
+    "ast_hash": "c024be360bd7be3bb8ff8943358fe1d5",
+    "semantic_hash": "c024be360bd7be3bb8ff8943358fe1d5"
+  },
+  "web/src/components/debug/TimingChart.jsx": {
+    "mtime": 1781893430.0,
+    "ast_hash": "46868c0e8af9447e0fcface39297d7cc",
+    "semantic_hash": "46868c0e8af9447e0fcface39297d7cc"
+  },
+  "web/src/lib/cvApi.js": {
+    "mtime": 1782250553.6786833,
+    "ast_hash": "e8118f756029ac65c5b58824928b012a",
+    "semantic_hash": ""
+  },
+  "web/src/lib/inference/angleCalculator.js": {
+    "mtime": 1781906359.0,
+    "ast_hash": "0def700b6d425de4ccc38b2766932ce8",
+    "semantic_hash": "0def700b6d425de4ccc38b2766932ce8"
+  },
+  "web/src/lib/inference/debugLogger.js": {
+    "mtime": 1781897807.0,
+    "ast_hash": "0c16baae3dfa88ef69d8c0638e39f541",
+    "semantic_hash": "0c16baae3dfa88ef69d8c0638e39f541"
+  },
+  "web/src/lib/inference/kalmanSmoother.js": {
+    "mtime": 1781854547.0,
+    "ast_hash": "8f4fcb5498bc1faf69a2da23ec0ec1c2",
+    "semantic_hash": "8f4fcb5498bc1faf69a2da23ec0ec1c2"
+  },
+  "web/src/lib/inference/onDeviceInference.js": {
+    "mtime": 1781885541.0,
+    "ast_hash": "4c5bb06ff2c6388e144c500e7ac46999",
+    "semantic_hash": "4c5bb06ff2c6388e144c500e7ac46999"
+  },
+  "web/src/lib/inference/onnxPoseInference.js": {
+    "mtime": 1781883527.0,
+    "ast_hash": "15ec2902cd37d9d1e0b0477ede307a08",
+    "semantic_hash": "15ec2902cd37d9d1e0b0477ede307a08"
+  },
+  "web/src/lib/inference/repCounter.js": {
+    "mtime": 1781854581.0,
+    "ast_hash": "120d5eb83fc22dc3884ffeb380c1c633",
+    "semantic_hash": "120d5eb83fc22dc3884ffeb380c1c633"
+  },
+  "web/src/lib/inference/skeletonRenderer.js": {
+    "mtime": 1781872374.0,
+    "ast_hash": "85b3043e57593f0118f2e49a769b6e4c",
+    "semantic_hash": "85b3043e57593f0118f2e49a769b6e4c"
+  },
+  "web/src/lib/inference/statsCalculator.js": {
+    "mtime": 1781883174.0,
+    "ast_hash": "d9c9e401fd998baa7db6c7be5d9dd878",
+    "semantic_hash": "d9c9e401fd998baa7db6c7be5d9dd878"
+  },
+  "web/src/lib/inference/testAllOrchestrator.js": {
+    "mtime": 1782095536.218782,
+    "ast_hash": "55ba091f81904574137701be20ccd7dd",
+    "semantic_hash": "55ba091f81904574137701be20ccd7dd"
+  },
+  "web/src/lib/inference/unifiedDebugLogger.js": {
+    "mtime": 1781892506.0,
+    "ast_hash": "9ec80f737a289f111535f69fc52b7f2c",
+    "semantic_hash": "9ec80f737a289f111535f69fc52b7f2c"
+  },
+  "web/src/main.jsx": {
+    "mtime": 1781827800.0,
+    "ast_hash": "835d05eeb7a777ae178e4eecc64018ee",
+    "semantic_hash": "835d05eeb7a777ae178e4eecc64018ee"
+  },
+  "web/src/pages/BenchmarkPage.jsx": {
+    "mtime": 1782097188.4504724,
+    "ast_hash": "d53b754af5dc4542cc91ab8edc40b82e",
+    "semantic_hash": "d53b754af5dc4542cc91ab8edc40b82e"
+  },
+  "web/src/pages/DebugComparePage.jsx": {
+    "mtime": 1781899590.0,
+    "ast_hash": "5759cac92108f6c9f70af8b93c664759",
+    "semantic_hash": "5759cac92108f6c9f70af8b93c664759"
+  },
+  "web/src/pages/DebugDashboardPage.jsx": {
+    "mtime": 1782094707.257213,
+    "ast_hash": "b6ab3827a03aa8da7d6fa4d83859bd5f",
+    "semantic_hash": "b6ab3827a03aa8da7d6fa4d83859bd5f"
+  },
+  "web/src/pages/FormAIPage.jsx": {
+    "mtime": 1782073018.0,
+    "ast_hash": "c597ea3fb429e1b1ddfc4e9ea98729d6",
+    "semantic_hash": "c597ea3fb429e1b1ddfc4e9ea98729d6"
+  },
+  "web/src/pages/FormAISetupPage.jsx": {
+    "mtime": 1782073018.0,
+    "ast_hash": "443c37374756bc445fe49155d2aa53ba",
+    "semantic_hash": "443c37374756bc445fe49155d2aa53ba"
+  },
+  "web/src/pages/HomePage.jsx": {
+    "mtime": 1781848415.0,
+    "ast_hash": "a648b3d39a163d3ed4f27691de82946e",
+    "semantic_hash": "a648b3d39a163d3ed4f27691de82946e"
+  },
+  "web/src/pages/SlingShotPage.jsx": {
+    "mtime": 1782073018.0,
+    "ast_hash": "d1be02f9ec8039ec6bb92851f8db7d7c",
+    "semantic_hash": "d1be02f9ec8039ec6bb92851f8db7d7c"
+  },
+  "web/src/pages/SmartFitPage.jsx": {
+    "mtime": 1782073018.0,
+    "ast_hash": "0302eb67297df88601797ac250337985",
+    "semantic_hash": "0302eb67297df88601797ac250337985"
+  },
+  "web/vite.config.js": {
+    "mtime": 1781896107.0,
+    "ast_hash": "5bc735c465b4b69aaec1e15d26ffe674",
+    "semantic_hash": "5bc735c465b4b69aaec1e15d26ffe674"
+  },
+  "services/rag-engine/main.py": {
+    "mtime": 1782250510.1403353,
+    "ast_hash": "27cf8fecae066237ca621422de7813bf",
+    "semantic_hash": ""
+  },
+  "services/cv-engine/cuda_pose.py": {
+    "mtime": 1789829336.017764,
+    "ast_hash": "3ab8ba7338bf25e10097b0092c83cb18",
+    "semantic_hash": ""
+  },
+  "services/cv-engine/export_tensorrt.py": {
+    "mtime": 1789829345.3740592,
+    "ast_hash": "11d6d7e645fccf9f7f6315b347e7f7f4",
+    "semantic_hash": ""
+  },
+  "services/cv-engine/setup_nvidia.ps1": {
+    "mtime": 1789829354.1794713,
+    "ast_hash": "17b9646387a5af07704c5a9a516b47a5",
+    "semantic_hash": ""
+  },
+  "out.wav": {
+    "mtime": 1782582302.7420805,
+    "ast_hash": "51ce0b2f51b82e35fb88cbbc1d5aaa2b",
+    "semantic_hash": ""
+  }
+}

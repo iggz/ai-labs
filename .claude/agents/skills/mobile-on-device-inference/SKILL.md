@@ -13,7 +13,7 @@ description: >
 
 When working on mobile on-device features, **read the full reference document first:**
 
-📄 [mobile-on-device-inference.md](file:///Users/iggypop/Documents/ai-labs/.agents/references/mobile-on-device-inference.md)
+📄 [mobile-on-device-inference.md](../../references/mobile-on-device-inference.md) (repo path: `.claude/agents/references/mobile-on-device-inference.md`)
 
 This reference contains:
 - iOS platform constraints (WebGPU, SharedArrayBuffer, VideoEncoder all broken)

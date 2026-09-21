@@ -1,6 +1,6 @@
 # Mobile On-Device Inference — Learnings & Reference
 > **Created:** 2026-06-19 | **Session:** iOS ONNX pose inference debugging
-> **Codebase:** `/Users/iggypop/Documents/ai-labs/web/`
+> **Codebase:** `web/` (repo root)
 > **Live URL:** `https://ilovetoridemybicycle.com/ai-labs`
 
 This document captures every bug, fix, workaround, and performance baseline discovered while implementing on-device YOLOv8s-pose inference for mobile browsers. **Load this file at the start of any future mobile on-device work.**

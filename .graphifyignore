@@ -1,0 +1,23 @@
+node_modules/
+web/node_modules/
+debug_videos/
+sample_videos/
+.wrangler/
+tests/
+.git/
+
+# Ignore documentation and assets to allow code-only extraction without LLM keys
+*.md
+*.txt
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.mov
+*.avi
+*.svg
+*.html
+*.css
+*.json
+*.jsonc
