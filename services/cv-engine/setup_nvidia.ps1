@@ -33,6 +33,18 @@ python -m pip install --upgrade pip setuptools wheel
 # -- 4. Install PyTorch with CUDA 12.8 support (Required for sm_120) --
 Write-Host ""
 Write-Host "-> Installing PyTorch (CUDA 12.8+ build for RTX 5090)..." -ForegroundColor Yellow
+# pip counts an existing CPU-only torch (e.g. 2.12.1+cpu from PyPI, newer than anything on cu128) as
+# satisfying 'torch' and skips the CUDA build, so remove any torch that isn't a CUDA build first.
+$torchCuda = python -c @"
+try:
+    import torch
+    print(torch.version.cuda or '')
+except ImportError:
+    pass
+"@
+if (-not $torchCuda) {
+    pip uninstall -y torch torchvision
+}
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 
 # -- 5. Install remaining dependencies from requirements-nvidia.txt --
@@ -86,6 +98,12 @@ if (Test-Path "yolov8s-pose.onnx") {
 if (-not (Test-Path "yolo11x-pose.engine")) {
     Write-Host "Exporting yolo11x-pose to TensorRT engine..." -ForegroundColor Yellow
     python export_tensorrt.py --model yolo11x-pose.pt --format engine --half
+    # $ErrorActionPreference doesn't stop on a failing native command, and without the engine the
+    # server quietly falls back to a slower model, so stop here instead of reporting success.
+    if (-not (Test-Path "yolo11x-pose.engine")) {
+        Write-Host "  [ERROR] TensorRT export failed - see the error above." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # -- 9. Create tests package --

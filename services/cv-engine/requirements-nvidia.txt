@@ -25,5 +25,7 @@ torchvision>=0.22.0
 # Pose Estimation & Runtime Engines
 ultralytics>=8.3.0
 onnxruntime-gpu>=1.20.0
-# Needed for .engine export — Ultralytics only auto-installs it on Linux. 10.8 = first Blackwell (sm_120) support
-tensorrt-cu12>=10.8
+# Needed for .engine export — Ultralytics only auto-installs it on Linux. 10.8 = first Blackwell (sm_120) support.
+# <11: TensorRT 11 dropped the FP16 builder flag, so Ultralytics needs nvidia-modelopt for FP16 export, which
+# downgrades onnxruntime-gpu and drags in cupy/polygraphy (and its uv auto-install fails on Windows).
+tensorrt-cu12>=10.8,<11
