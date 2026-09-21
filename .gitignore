@@ -32,6 +32,9 @@ services/cv-engine/.env
 static/
 services/cv-engine/static/
 
+# Server logs written by start_pc.ps1
+services/cv-engine/uvicorn*.log
+
 # Machine-local (not portable between Mac and PC)
 .claude/settings.local.json
 vault
