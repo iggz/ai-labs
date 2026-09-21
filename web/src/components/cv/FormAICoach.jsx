@@ -873,8 +873,9 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
           sessionTimestamps={result?._timestamps}
         />
 
-        {/* FormAI RAG Chat Assistant */}
-        <FormAICoachChat />
+        {/* FormAI RAG Chat Assistant — hidden in production until the RAG engine is hosted
+            (without VITE_RAG_API_URL it would call localhost:8000 from visitors' browsers) */}
+        {(import.meta.env.DEV || import.meta.env.VITE_RAG_API_URL) && <FormAICoachChat />}
 
         {/* Analyze Another — bottom of dashboard */}
         <button
