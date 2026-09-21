@@ -39,6 +39,26 @@ class TestEncodingUtils(unittest.TestCase):
             self.assertIn("p4", flags)
 
 
+class TestFFmpegPipeWriter(unittest.TestCase):
+    def test_output_is_browser_playable_yuv420p(self):
+        """Real encode with this machine's best encoder (NVENC on the PC) must come out 4:2:0, not gbrp/yuv444p."""
+        import subprocess
+        import tempfile
+        from ffmpeg_writer import FFmpegPipeWriter
+
+        with FFmpegPipeWriter(width=320, height=240, fps=30, target_width=320) as writer:
+            for i in range(10):
+                writer.write(np.full((240, 320, 3), (0, 0, 25 * i), dtype=np.uint8))
+            mp4 = writer.finish()
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            f.write(mp4)
+        probe = subprocess.run([encoding_utils.FFMPEG_EXE, "-hide_banner", "-i", f.name],
+                               capture_output=True, text=True).stderr
+        os.unlink(f.name)
+        self.assertIn("yuv420p", probe)
+
+
 class TestCUDAPoseModel(unittest.TestCase):
     """Test CUDAPoseModel interface and fallback contract."""
 
