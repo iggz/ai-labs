@@ -235,6 +235,11 @@ MAX_IMAGE_BYTES = 10 * 1024 * 1024    # 10 MB
 
 # ── Supabase Helper Utilities ─────────────────────────────────────────────────
 
+# Signed URL lifetime for processed videos. Supabase's daily pg_cron job
+# (cleanup_expired_cv_data) trims cv-processed to 800 MB, oldest first.
+VIDEO_TTL = timedelta(hours=72)
+
+
 async def _upload_to_supabase_storage(
     file_bytes: bytes,
     object_name: str,
@@ -294,9 +299,8 @@ async def _upload_to_supabase_storage(
             file_bytes,
             {"content-type": content_type},
         )
-        # Create 72-hour signed URL (3 days)
         signed = supabase.storage.from_("cv-processed").create_signed_url(
-            object_name, expires_in=259200
+            object_name, expires_in=int(VIDEO_TTL.total_seconds())
         )
         return signed.get("signedURL")
     except Exception as exc:
