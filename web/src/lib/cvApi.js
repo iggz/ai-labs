@@ -5,9 +5,9 @@
  * Communicates with the FastAPI CV engine via Cloudflare Tunnels.
  *
  * Multi-device routing (production):
- *   dml    → https://api.ilovetoridemybicycle.com       (PC Tower, AMD DirectML — default)
+ *   cuda   → https://api.ilovetoridemybicycle.com       (PC Tower, RTX 5090 TensorRT/CUDA — default)
  *   yolo   → https://api-mac.ilovetoridemybicycle.com   (Mac, CoreML / Metal M4 Pro)
- *   cuda   → https://api-cuda.ilovetoridemybicycle.com  (Laptop, NVIDIA CUDA — coming soon)
+ *   dml    → https://api.ilovetoridemybicycle.com       (legacy — PC's AMD card is gone; server serves it via CUDA)
  *   opencv → https://api.ilovetoridemybicycle.com       (PC Tower, OpenCV DNN fallback)
  *
  * Developer override: set localStorage key 'AILABS_CV_API_URL' to redirect
@@ -20,9 +20,9 @@
 
 // ── Production routing table ───────────────────────────────────────────────────
 const PROTOCOL_HOSTS = {
-  dml:    'https://api.ilovetoridemybicycle.com',       // PC Tower — AMD DirectML (RX 7800 XT)
+  cuda:   'https://api.ilovetoridemybicycle.com',       // PC Tower — NVIDIA RTX 5090 (TensorRT / CUDA)
   yolo:   'https://api-mac.ilovetoridemybicycle.com',   // Mac — CoreML / Metal (M4 Pro)
-  cuda:   'https://api-cuda.ilovetoridemybicycle.com',  // Laptop — NVIDIA CUDA (RTX 2060) — coming soon
+  dml:    'https://api.ilovetoridemybicycle.com',       // Legacy — old saved prefs; PC serves it via CUDA
   opencv: 'https://api.ilovetoridemybicycle.com',       // PC Tower — OpenCV DNN (fallback)
 };
 
@@ -35,7 +35,7 @@ export function getApiBase() {
     const custom = localStorage.getItem('AILABS_CV_API_URL');
     if (custom) return custom.trim().replace(/\/$/, '');
   }
-  return import.meta.env.VITE_CV_API_URL || PROTOCOL_HOSTS.dml;
+  return import.meta.env.VITE_CV_API_URL || PROTOCOL_HOSTS.cuda;
 }
 
 /**
@@ -218,5 +218,40 @@ export async function deleteAnalysis(analysisId) {
 export async function getCVHealth() {
   const res = await fetch(`${getApiBase()}/api/v1/health`);
   if (!res.ok) throw new Error('CV engine unreachable');
+  return res.json();
+}
+
+/**
+ * Returns the RAG API base URL.
+ * Priority: localStorage override > VITE_RAG_API_URL env > localhost default.
+ */
+export function getRagApiBase() {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('AILABS_RAG_API_URL');
+    if (custom) return custom.trim().replace(/\/$/, '');
+  }
+  return import.meta.env.VITE_RAG_API_URL || 'http://localhost:8000';
+}
+
+/**
+ * Send a query to the RAG Knowledge Graph.
+ *
+ * @param {string} query - The user's query string
+ * @param {string} [mode='hybrid'] - Retrieval mode: 'naive' | 'local' | 'global' | 'hybrid' | 'mix'
+ * @returns {Promise<Object>} - Synthesized response from the coach
+ */
+export async function queryRag(query, mode = 'hybrid') {
+  const apiBase = getRagApiBase();
+  const res = await fetch(`${apiBase}/api/v1/rag/query`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query, mode }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'RAG query failed' }));
+    throw new Error(err.detail || 'RAG query failed');
+  }
   return res.json();
 }

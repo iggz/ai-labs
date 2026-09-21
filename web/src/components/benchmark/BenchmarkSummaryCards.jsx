@@ -12,7 +12,7 @@ const PROTOCOL_META = {
   dml: {
     icon: '⚡',
     name: '⚡⚡ DirectML',
-    machine: 'AMD RX 7800 XT · PC Tower',
+    machine: 'AMD RX 7800 XT · PC Tower (retired)',
     colorClass: 'benchmark-card--dml',
     comingSoon: false,
   },
@@ -26,9 +26,9 @@ const PROTOCOL_META = {
   cuda: {
     icon: '🟢',
     name: 'CUDA',
-    machine: 'NVIDIA RTX 2060 · Laptop',
+    machine: 'NVIDIA RTX 5090 · PC Tower',
     colorClass: 'benchmark-card--cuda',
-    comingSoon: true,
+    comingSoon: false,
   },
   'on-device': {
     icon: '📱',

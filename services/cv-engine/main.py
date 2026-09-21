@@ -26,8 +26,9 @@ import hashlib
 import time as _time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, Header
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -55,6 +56,7 @@ _platform        = sys.platform  # 'darwin', 'win32', 'linux'
 
 _HOSTNAME_TO_ID: dict[str, str] = {
     "mac.lan":        "mac",
+    "GamingPC":       "pc",
     "DESKTOP-4V907DI": "pc",
 }
 MACHINE_ID = _HOSTNAME_TO_ID.get(MACHINE_HOSTNAME, MACHINE_HOSTNAME)
@@ -531,6 +533,82 @@ async def analyze_smartfit(
         "status": "queued",
         "position": job.position_in_queue,
         "estimated_wait_seconds": job.position_in_queue * 15,
+    }
+
+
+class CrawlRequest(BaseModel):
+    url: str
+    filename: str | None = None
+
+
+def _run_crawl_in_background(url: str, filename: str, api_key: str):
+    try:
+        from firecrawl import Firecrawl
+        logger.info(f"[FIRECRAWL] Starting scrape for URL: {url}")
+        app_fc = Firecrawl(api_key=api_key)
+        
+        # Scrape page
+        scrape_result = app_fc.scrape(url, formats=["markdown"])
+        markdown_content = scrape_result.get("markdown", "")
+        
+        if not markdown_content:
+            logger.error(f"[FIRECRAWL] Scrape returned empty markdown for URL: {url}")
+            return
+            
+        # Target directory: services/rag-engine/ingest/
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ingest_dir = os.path.join(base_dir, "rag-engine", "ingest")
+        os.makedirs(ingest_dir, exist_ok=True)
+        
+        target_path = os.path.join(ingest_dir, filename)
+        with open(target_path, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+            
+        logger.info(f"[FIRECRAWL] Successfully scraped and saved: {target_path} ({len(markdown_content)} chars)")
+    except Exception as e:
+        logger.error(f"[FIRECRAWL] Scrape failed for URL {url}: {e}")
+
+
+@app.post("/api/v1/crawl/exercise")
+async def crawl_exercise(req: CrawlRequest, background_tasks: BackgroundTasks):
+    """
+    Scrapes a workout or biomechanics resource page to Markdown and stores it locally.
+    Runs asynchronously as a background task.
+    """
+    api_key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="FIRECRAWL_API_KEY environment variable is not configured on the backend."
+        )
+        
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Target URL cannot be empty.")
+        
+    # Derive filename if not provided
+    if not req.filename or not req.filename.strip():
+        parsed = urlparse(url)
+        path_part = parsed.path.strip("/").replace("/", "_")
+        domain_part = parsed.netloc.replace("www.", "")
+        if path_part:
+            derived_name = f"{domain_part}_{path_part}.md"
+        else:
+            derived_name = f"{domain_part}.md"
+        # Sanitize filename
+        filename = "".join(c for c in derived_name if c.isalnum() or c in "._-").strip()
+    else:
+        filename = req.filename.strip()
+        if not filename.endswith(".md"):
+            filename += ".md"
+            
+    background_tasks.add_task(_run_crawl_in_background, url, filename, api_key)
+    
+    return {
+        "status": "accepted",
+        "url": url,
+        "filename": filename,
+        "message": "Scrape operation queued successfully in background."
     }
 
 

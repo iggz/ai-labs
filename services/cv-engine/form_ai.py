@@ -87,6 +87,12 @@ def _get_pose_model(protocol: str = "opencv"):
                 _main._checkpoint("MODEL_LOAD", f"class=UltralyticsYOLOModel device={_yolo_model.device}")
         return _yolo_model
     elif protocol == "dml":
+        import onnxruntime as ort
+        eps = ort.get_available_providers()
+        if "DmlExecutionProvider" not in eps and "CUDAExecutionProvider" in eps:
+            # ponytail: PC tower went AMD → RTX 5090 but the site still routes 'dml' there;
+            # serve it from CUDA instead of silently falling back to CPU. Drop once the frontend sends 'cuda'.
+            return _get_pose_model("cuda")
         if _dml_model is None:
             from dml_pose import DMLPoseModel
             _dml_model = DMLPoseModel("yolov8s-pose.onnx")
@@ -96,10 +102,26 @@ def _get_pose_model(protocol: str = "opencv"):
         return _dml_model
     elif protocol == "cuda":
         if _cuda_model is None:
-            raise NotImplementedError(
-                "CUDA backend not yet available on this machine. "
-                "Deploy cv-engine on the NVIDIA laptop to enable this protocol."
-            )
+            from cuda_pose import CUDAPoseModel
+            model_path = "yolov8s-pose.onnx"
+            for candidate in (
+                "yolo11x-pose.engine",
+                "yolo11m-pose.engine",
+                "yolov8s-pose.engine",
+                "yolo11x-pose.onnx",
+                "yolo11m-pose.onnx",
+                "yolo11x-pose.pt",  # torch FP16 on a 5090 still beats v8s accuracy by ~10 mAP
+                "yolov8s-pose.onnx",
+                "yolov8s-pose.pt",
+            ):
+                if os.path.exists(candidate):
+                    model_path = candidate
+                    break
+
+            _cuda_model = CUDAPoseModel(model_path=model_path, prefer_tensorrt=True)
+            _main.INFERENCE_BACKEND = _cuda_model._backend_type
+            logger.info(f"CUDA/TensorRT model loaded [{model_path}] on: {_cuda_model.device}")
+            _main._checkpoint("MODEL_LOAD", f"class=CUDAPoseModel device={_cuda_model.device} model={model_path}")
         return _cuda_model
     else:
         raise ValueError(f"Unknown protocol: {protocol}")
@@ -146,12 +168,12 @@ def _process_form_ai_sync(payload: dict) -> dict:
     debug = payload.get("debug", False)
 
     t_model = time.perf_counter()
-    was_cached = (
-        (_opencv_model is not None) if protocol == "opencv"
-        else (_yolo_model is not None) if protocol == "yolo"
-        else (_dml_model is not None) if protocol == "dml"
-        else False
-    )
+    was_cached = {
+        "opencv": _opencv_model,
+        "yolo":   _yolo_model,
+        "dml":    _dml_model or _cuda_model,  # 'dml' may be served by CUDA (see _get_pose_model)
+        "cuda":   _cuda_model,
+    }.get(protocol) is not None
     pose_model = _get_pose_model(protocol)
     model_load_ms = round((time.perf_counter() - t_model) * 1000, 1)
     smoother = KeypointSmoother(num_keypoints=17, max_interpolation_frames=8)

@@ -3,8 +3,7 @@
  *
  * Validates that selecting Metal (YOLO) in the UI routes POST requests to the Mac
  * backend (api-mac.ilovetoridemybicycle.com), DML routes to the PC backend
- * (api.ilovetoridemybicycle.com), and CUDA routes to api-cuda (routing table only —
- * verified by bypassing the disabled button via localStorage).
+ * (api.ilovetoridemybicycle.com), and CUDA (default, RTX 5090) routes to the PC backend too.
  *
  * Uses request interception to capture the outbound URL — no real upload
  * is sent (all matching requests are aborted after the host is captured).
@@ -18,7 +17,6 @@ import { test, expect } from '@playwright/test';
 const BASE_URL   = 'https://ilovetoridemybicycle.com/ai-labs';
 const MAC_HOST   = 'api-mac.ilovetoridemybicycle.com';
 const PC_HOST    = 'api.ilovetoridemybicycle.com';
-const CUDA_HOST  = 'api-cuda.ilovetoridemybicycle.com';
 
 /**
  * Navigate to /form-ai, bypass the onboarding gate via localStorage,
@@ -85,36 +83,21 @@ test.describe('Protocol routing', () => {
     expect(host).toBe(PC_HOST);
   });
 
-  test('CUDA protocol routes to CUDA backend (placeholder)', async ({ page }) => {
-    // Bypass the disabled button by setting protocol directly in localStorage.
-    // This verifies the routing table plumbing is wired — the button is disabled
-    // in the UI until the NVIDIA laptop is online.
+  test('CUDA protocol sends POST to PC backend', async ({ page }) => {
     const host = await getSubmitHostForProtocol(page, 'cuda');
     console.log(`CUDA → host: ${host}`);
-    expect(host).toBe(CUDA_HOST);
+    expect(host).toBe(PC_HOST);
   });
 
-  test('Default protocol is DML (no override present)', async ({ page }) => {
-    // Verify that the default protocol in a fresh session routes to the PC (DML).
-    await page.addInitScript(() => {
-      localStorage.setItem('formai_onboarded', 'true');
-      localStorage.removeItem('hhb_protocol');         // clear saved pref → use default
-      localStorage.removeItem('AILABS_CV_API_URL');
-    });
-
-    await page.goto(`${BASE_URL}/form-ai`, { waitUntil: 'networkidle' });
-
-    const result = await page.evaluate(() => {
-      return {
-        // These are the expected values after the fix
-        expected_dml:  'https://api.ilovetoridemybicycle.com',
-        expected_yolo: 'https://api-mac.ilovetoridemybicycle.com',
-        expected_cuda: 'https://api-cuda.ilovetoridemybicycle.com',
-      };
-    });
-
-    expect(result.expected_dml).toBe('https://api.ilovetoridemybicycle.com');
-    expect(result.expected_yolo).toBe('https://api-mac.ilovetoridemybicycle.com');
-    expect(result.expected_cuda).toBe('https://api-cuda.ilovetoridemybicycle.com');
+  test('Default protocol is CUDA, and a saved legacy DML pref migrates to it', async ({ page }) => {
+    for (const saved of [null, 'dml']) {
+      await page.addInitScript((pref) => {
+        localStorage.setItem('formai_onboarded', 'true');
+        if (pref) localStorage.setItem('hhb_protocol', pref);
+        else localStorage.removeItem('hhb_protocol');   // fresh session → default
+      }, saved);
+      await page.goto(`${BASE_URL}/form-ai`, { waitUntil: 'networkidle' });
+      await expect(page.locator('#formai-protocol-cuda')).toHaveAttribute('aria-checked', 'true');
+    }
   });
 });

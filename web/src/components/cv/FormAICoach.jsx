@@ -15,9 +15,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Upload, AlertTriangle, Info, RotateCcw,
-  Video, Download, Zap, BarChart
+  Video, Download, Zap, BarChart,
+  MessageSquare, Send, Sparkles, Bot
 } from 'lucide-react';
-import { submitAnalysis } from '../../lib/cvApi';
+import { submitAnalysis, queryRag } from '../../lib/cvApi';
 import { FormAIAudioEngine } from './FormAIAudioEngine';
 import { FormStatsDashboard } from './FormStatsDashboard';
 import { InfoPopover } from './InfoPopover';
@@ -56,9 +57,8 @@ const CAMERA_ANGLE_GUIDANCE = {
 };
 
 const PROTOCOLS = [
-  { id: 'dml',       label: '⚡⚡ DirectML', accent: true },
+  { id: 'cuda',      label: '⚡⚡ CUDA', accent: true },
   { id: 'yolo',      label: 'Metal'     },
-  { id: 'cuda',      label: 'CUDA',       disabled: true, tooltip: 'Coming soon — NVIDIA RTX 2060' },
   { id: 'on-device', label: 'On Device' },
 ];
 
@@ -177,7 +177,7 @@ function ConfigureAndUploadStep({
         <div className="formai-configure__label-row">
           <span className="formai-configure__section-label">Processing</span>
           <InfoPopover id="info-protocol">
-            <p><strong>⚡⚡ DirectML</strong> — AMD RX 7800 XT, fastest server processing.<br /><strong>Metal</strong> — Apple M4 Pro, CoreML Neural Engine acceleration.<br /><strong>CUDA</strong> — NVIDIA RTX 2060 (coming soon).<br /><strong>On Device</strong> — Runs privately in your browser, no upload needed. Speed depends on your device GPU.</p>
+            <p><strong>⚡⚡ CUDA</strong> — NVIDIA RTX 5090 with TensorRT, fastest server processing.<br /><strong>Metal</strong> — Apple M4 Pro, CoreML Neural Engine acceleration.<br /><strong>On Device</strong> — Runs privately in your browser, no upload needed. Speed depends on your device GPU.</p>
           </InfoPopover>
         </div>
         <div className="formai-segmented" role="radiogroup" aria-label="Processing protocol">
@@ -504,6 +504,131 @@ function ProcessingStep({ progress, protocol }) {
   );
 }
 
+// ── FormAI RAG Chat Assistant Sub-Component ──────────────────────────────────
+function FormAICoachChat() {
+  const [messages, setMessages] = useState([
+    {
+      id: 'welcome',
+      sender: 'coach',
+      text: "Hey! I'm your FormAI Coach. Ask me anything about your technique, performance, or tips to optimize your form!"
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isQuerying, setIsQuerying] = useState(false);
+  const [error, setError] = useState(null);
+  const [mode, setMode] = useState('hybrid');
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isQuerying]);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isQuerying) return;
+
+    const userMsg = { id: crypto.randomUUID(), sender: 'user', text: input.trim() };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsQuerying(true);
+    setError(null);
+
+    try {
+      const res = await queryRag(userMsg.text, mode);
+      const coachMsg = { id: crypto.randomUUID(), sender: 'coach', text: res.answer };
+      setMessages(prev => [...prev, coachMsg]);
+    } catch (err) {
+      console.error('Chat error:', err);
+      setError('Could not connect to the Coach service. Please ensure the RAG backend is running.');
+    } finally {
+      setIsQuerying(false);
+    }
+  };
+
+  return (
+    <div className="formai-chat-card">
+      <div className="formai-chat-header">
+        <div className="formai-chat-title">
+          <Sparkles size={16} className="text-glow-rose" style={{ color: 'var(--cv-rose)' }} />
+          <span>Ask FormAI Coach</span>
+        </div>
+        <div className="formai-chat-mode-selector">
+          <label htmlFor="rag-mode-select" className="sr-only">Retrieval Mode</label>
+          <select
+            id="rag-mode-select"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            className="formai-chat-select"
+          >
+            <option value="hybrid">Standard (Hybrid)</option>
+            <option value="mix">Detailed (Mix)</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="formai-chat-messages">
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`formai-chat-message formai-chat-message--${msg.sender}`}
+          >
+            <div className="formai-chat-avatar">
+              {msg.sender === 'coach' ? <Bot size={14} /> : 'ME'}
+            </div>
+            <div className="formai-chat-bubble">
+              {msg.text}
+            </div>
+          </div>
+        ))}
+        {isQuerying && (
+          <div className="formai-chat-message formai-chat-message--coach">
+            <div className="formai-chat-avatar">
+              <Bot size={14} />
+            </div>
+            <div className="formai-chat-bubble formai-chat-bubble--loading">
+              <div className="formai-chat-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        )}
+        {error && (
+          <div className="formai-chat-error">
+            <AlertTriangle size={12} /> {error}
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <form onSubmit={handleSend} className="formai-chat-input-wrapper">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask a technique or coaching question..."
+          className="formai-chat-input"
+          disabled={isQuerying}
+          aria-label="Coach query text"
+        />
+        <button
+          type="submit"
+          className="btn btn--primary btn--icon formai-chat-send-btn"
+          disabled={!input.trim() || isQuerying}
+          aria-label="Send query"
+        >
+          <Send size={14} />
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ── Step: Results (two-tab layout) ───────────────────────────────────────────
 function ResultsStep({ result, onReset, getAudioEngine }) {
   const { signed_url, metadata, processing_log, _debugLogger } = result;
@@ -748,6 +873,9 @@ function ResultsStep({ result, onReset, getAudioEngine }) {
           sessionTimestamps={result?._timestamps}
         />
 
+        {/* FormAI RAG Chat Assistant */}
+        <FormAICoachChat />
+
         {/* Analyze Another — bottom of dashboard */}
         <button
           id="formai-analyze-another-bottom"
@@ -831,7 +959,7 @@ export function FormAICoach() {
   const [exercise,    setExerciseRaw]    = useState(() => loadPref('hhb_exercise',     'squat'));
   const [cameraAngle, setCameraAngleRaw] = useState(() => loadPref('hhb_camera_angle', 'auto'));
   const [overlayMode, setOverlayModeRaw] = useState(() => loadPref('hhb_overlay_mode', 'full'));
-  const [protocol,    setProtocolRaw]    = useState(() => loadPref('hhb_protocol',     'dml'));
+  const [protocol,    setProtocolRaw]    = useState(() => { const p = loadPref('hhb_protocol', 'cuda'); return p === 'dml' ? 'cuda' : p; }); // 'dml' = retired AMD card
 
   const setExercise    = useCallback(v => { savePref('hhb_exercise',     v); setExerciseRaw(v);    }, []);
   const setCameraAngle = useCallback(v => { savePref('hhb_camera_angle', v); setCameraAngleRaw(v); }, []);

@@ -5,14 +5,18 @@ Centralised detection and caching of H.264 encoder availability.
 Supports imageio-ffmpeg for portable path resolution on Windows.
 """
 
+import shutil
 import subprocess
 import logging
-import imageio_ffmpeg
 
 logger = logging.getLogger(__name__)
 
 # Resolve FFmpeg executable path portably
-FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+try:
+    import imageio_ffmpeg
+    FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+except (ImportError, Exception):
+    FFMPEG_EXE = shutil.which("ffmpeg") or "ffmpeg"
 
 
 def _detect_available_encoders() -> set[str]:
@@ -43,7 +47,10 @@ AVAILABLE_ENCODERS = _detect_available_encoders()
 logger.info(f"Available H.264 encoders: {AVAILABLE_ENCODERS}")
 
 # Select the best hardware encoder
-if "h264_amf" in AVAILABLE_ENCODERS:
+if "h264_nvenc" in AVAILABLE_ENCODERS:
+    BEST_ENCODER = "h264_nvenc"
+    USE_HW_ENCODER = True
+elif "h264_amf" in AVAILABLE_ENCODERS:
     BEST_ENCODER = "h264_amf"
     USE_HW_ENCODER = True
 elif "h264_videotoolbox" in AVAILABLE_ENCODERS:
@@ -64,7 +71,9 @@ def get_encoder() -> str:
 
 def get_encoder_flags() -> list[str]:
     """Return encoder-specific FFmpeg flags for the active encoder."""
-    if BEST_ENCODER == "h264_amf":
+    if BEST_ENCODER == "h264_nvenc":
+        return ["-preset", "p4", "-tune", "hq"]
+    elif BEST_ENCODER == "h264_amf":
         return ["-quality", "balanced"]
     elif BEST_ENCODER == "h264_videotoolbox":
         return ["-q:v", "65"]

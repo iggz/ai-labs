@@ -8,6 +8,8 @@ web/dist/
 *.onnx
 *.pt
 *.mlpackage
+*.engine
+trt_cache/
 
 # Debug/temp
 debug_videos/
@@ -29,3 +31,8 @@ services/cv-engine/.env
 # Local processed/debug video output
 static/
 services/cv-engine/static/
+
+# Machine-local (not portable between Mac and PC)
+.claude/settings.local.json
+vault
+.env

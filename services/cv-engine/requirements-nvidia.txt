@@ -1,0 +1,29 @@
+# HHB CV Engine - NVIDIA GPU (RTX 5090 / Blackwell sm_120) Requirements
+# ======================================================================
+
+# Core API & utilities
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+supervision==0.25.1
+opencv-python-headless==4.11.0.86
+supabase==2.15.1
+python-multipart==0.0.20
+pydantic==2.11.3
+numpy==2.2.6
+httpx==0.28.1
+pytest==8.3.5
+pytest-asyncio==0.25.3
+python-dotenv==1.2.2
+imageio-ffmpeg>=0.4.9
+firecrawl-py>=1.0.0
+
+# PyTorch with CUDA 12.8+ (Blackwell sm_120 requires torch>=2.7.0)
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch>=2.7.0
+torchvision>=0.22.0
+
+# Pose Estimation & Runtime Engines
+ultralytics>=8.3.0
+onnxruntime-gpu>=1.20.0
+# Needed for .engine export — Ultralytics only auto-installs it on Linux. 10.8 = first Blackwell (sm_120) support
+tensorrt-cu12>=10.8

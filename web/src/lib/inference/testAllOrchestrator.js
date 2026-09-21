@@ -1,7 +1,7 @@
 /**
  * TestAllOrchestrator — Sequential 3-method benchmarking for ?debug=1 mode.
  *
- * Runs the same video through DirectML → Metal → On Device sequentially,
+ * Runs the same video through CUDA → Metal → On Device sequentially,
  * collecting unified telemetry for each. Creates a batch entry in KV
  * to group the 3 runs together for side-by-side comparison.
  *
@@ -48,7 +48,7 @@ async function saveBatchMetadata(batchNumber, data) {
 }
 
 /**
- * Run the same video through DirectML, Metal, and On Device sequentially.
+ * Run the same video through CUDA, Metal, and On Device sequentially.
  *
  * @param {File} file — video file
  * @param {Object} options
@@ -66,7 +66,7 @@ export async function runTestAll(file, { exerciseType, cameraAngle, overlayMode,
   const runNumbers = [];
 
   const methods = [
-    { key: 'dml',       label: '⚡⚡ DirectML', protocol: 'dml',       isOnDevice: false },
+    { key: 'cuda',      label: '⚡⚡ CUDA',     protocol: 'cuda',      isOnDevice: false },
     { key: 'yolo',      label: 'Metal',          protocol: 'yolo',      isOnDevice: false },
     { key: 'on-device', label: 'On Device',      protocol: 'on-device', isOnDevice: true  },
   ];
