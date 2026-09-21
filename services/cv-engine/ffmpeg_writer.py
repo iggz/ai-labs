@@ -96,6 +96,9 @@ class FFmpegPipeWriter:
             "-vf", f"scale={target_width}:-2",
             "-r", str(fps),
             "-c:v", encoder,
+            # Browsers only play 4:2:0. Without this, bgr24 input makes h264_nvenc pick gbrp
+            # (High 4:4:4, G stored as luma → green/magenta video) and libx264 pick yuv444p.
+            "-pix_fmt", "yuv420p",
             "-b:v", target_bitrate,
             "-an",                                          # Strip audio
             "-movflags", "+faststart+frag_keyframe",       # Progressive + fragmented
