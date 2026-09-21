@@ -9,7 +9,7 @@ This document contains standard commands for building, running, and testing the 
   ```bash
   wrangler dev
   ```
-- **Production Deployment:**
+- **Production Deployment:** pushing `main` deploys automatically (Cloudflare git integration, about a minute). `wrangler deploy` is only needed to deploy without a push.
   ```bash
   wrangler deploy
   ```
@@ -45,6 +45,8 @@ This document contains standard commands for building, running, and testing the 
 | Tests | `pytest` | `pytest` |
 
 `setup_win.ps1` is the retired AMD/DirectML setup — don't run it on the PC (it installs `onnxruntime-directml`, which clashes with `onnxruntime-gpu`).
+
+**PC production:** the server and the Cloudflare tunnel (`hhb-cv-engine` → `api.ilovetoridemybicycle.com`) start at sign-in via the Task Scheduler task "ai-labs cv-engine", which runs `start_pc.ps1`; it restarts either process within ~10s if it exits. Stopping the task doesn't stop them, so kill `python`/`cloudflared` as well. Only the PC may run a connector for `hhb-cv-engine` (the Mac runs `hhb-cv-engine-mac` only): two connectors split traffic and break job polling.
 
 ---
 
