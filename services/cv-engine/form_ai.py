@@ -298,7 +298,7 @@ def _process_form_ai_sync(payload: dict) -> dict:
         )
 
         # ── Compute non-biometric metadata ────────────────────────────────────
-        rep_count = count_reps(angles_per_frame, exercise_type if exercise_type != "auto" else "squat")
+        rep_count = count_reps(angles_per_frame, exercise_type if exercise_type != "auto" else "squat", fps=float(fps))
         duration_sec = round(len(angles_per_frame) / fps, 1)
         avg_cam_elevation = round(float(np.mean(camera_elevations)) if camera_elevations else 0.0, 1)
 

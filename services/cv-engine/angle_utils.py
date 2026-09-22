@@ -198,102 +198,82 @@ def get_exercise_angle(
     }
 
 
-def count_reps(angles: list, exercise_type: str) -> int:
+# ── Rep segmentation ──────────────────────────────────────────────────────────
+# A rep is a down-and-back swing of the primary angle, not a crossing of a fixed angle.
+# The old fixed rule (enter at 90° / 160°) broke when the pose model changed: yolo11x reads
+# hip-thrust lockouts ~10° lower than yolov8s, so 9 real reps became 1. A swing doesn't care
+# if a model reads every angle a few degrees high or low.
+# ponytail: calibration knobs, tuned on sample_videos/ with yolov8s + yolo11x (12/14 runs exact;
+# the misses are a scene cut in an edited clip). Squat 45°: walking the bar out bends the knee
+# ~40°, real squats swing 60°+. Hip thrust 25°: it only swings ~40° in 2D from a 3/4 camera.
+MIN_REP_SWING_DEG = {"squat": 45.0, "deadlift": 30.0, "hip_thrust": 25.0}
+SPIKE_FILTER_SEC = 0.15  # median window that removes few-frame keypoint glitches
+
+
+def _segment_reps(angles: list, exercise_type: str, fps: float = 30.0):
     """
-    Count exercise repetitions from a time-series of angles.
-    Uses simple peak detection with hysteresis.
+    Split a per-frame angle series into reps.
 
-    Args:
-        angles: List of angle measurements per frame (None values skipped)
-        exercise_type: 'squat' | 'deadlift' | 'hip_thrust'
-
-    Returns:
-        Rep count (capped at 50 to prevent misuse)
+    Returns (frames, smoothed, reps, rest):
+        frames   — original frame index of each valid (non-None/NaN) angle
+        smoothed — median-filtered valid angles, same length as frames
+        reps     — (start, turn, end) positions into smoothed for each rep: leaving
+                   the rest position, the turning point, and arriving back
+        rest     — 'hi' or 'lo': the end of the swing each rep starts from
     """
-    valid = [a for a in angles if a is not None and not np.isnan(a)]
-    if not valid:
-        return 0
+    a = np.array([np.nan if x is None else x for x in angles], dtype=float)
+    frames = np.flatnonzero(~np.isnan(a))
+    if len(frames) < 3:
+        return frames, a[frames], [], "hi"
 
-    # Squat: count troughs (low angle = deep squat = rep bottom)
-    # Deadlift/Hip Thrust: count peaks (high angle = lockout = rep top)
-    is_squat = exercise_type == "squat"
-    threshold = SQUAT_DEPTH_THRESHOLD if is_squat else (DEADLIFT_LOCKOUT_THRESHOLD - 10)
+    w = max(1, int(round(SPIKE_FILTER_SEC * max(fps, 1.0)))) | 1   # odd window
+    padded = np.pad(a[frames], w // 2, mode="edge")
+    s = np.median(np.lib.stride_tricks.sliding_window_view(padded, w), axis=1)
 
-    reps = 0
-    in_rep = False
+    # Zigzag: a high/low becomes a turning point once the angle moves a full swing away from it
+    swing = MIN_REP_SWING_DEG.get(exercise_type, 30.0)
+    turns: list[tuple[int, str]] = []
+    trend, hi, lo = 0, 0, 0
+    for i, v in enumerate(s):
+        if v > s[hi]:
+            hi = i
+        if v < s[lo]:
+            lo = i
+        if trend != -1 and s[hi] - v >= swing:
+            turns.append((hi, "hi"))
+            trend, lo = -1, i
+        elif trend != 1 and v - s[lo] >= swing:
+            turns.append((lo, "lo"))
+            trend, hi = 1, i
+    if trend == 1:
+        turns.append((hi, "hi"))
+    elif trend == -1:
+        turns.append((lo, "lo"))
 
-    for angle in valid:
-        if is_squat:
-            if not in_rep and angle <= threshold:
-                in_rep = True
-            elif in_rep and angle > threshold + 15:
-                reps += 1
-                in_rep = False
-        else:
-            if not in_rep and angle >= threshold:
-                in_rep = True
-            elif in_rep and angle < threshold - 15:
-                reps += 1
-                in_rep = False
-
-    return min(reps, 50)  # Safety cap per plan spec
+    # Squats start standing and hip thrusts at the bottom; deadlifts start from the floor
+    # or from the top (RDL / unrack), so use whichever turn the video starts on.
+    rest = {"squat": "hi", "hip_thrust": "lo"}.get(exercise_type, turns[0][1] if turns else "hi")
+    reps = [
+        (p0, p1, p2)
+        for (p0, _), (p1, k1), (p2, _) in zip(turns, turns[1:], turns[2:])
+        if k1 != rest
+    ]
+    return frames, s, reps[:50], rest   # safety cap
 
 
-# ── Per-rep extraction ────────────────────────────────────────────────────────
+def count_reps(angles: list, exercise_type: str, fps: float = 30.0) -> int:
+    """Count reps as full swings of the primary angle (see _segment_reps). Capped at 50."""
+    return len(_segment_reps(angles, exercise_type, fps)[2])
 
-def _extract_per_rep_angles(angles: list, exercise_type: str) -> list[float]:
+
+def _extract_per_rep_angles(angles: list, exercise_type: str, fps: float = 30.0) -> list[float]:
     """
-    Walk the angle time-series and record the extremum angle for each detected rep.
-
-    For squats: records the *minimum* (deepest) angle reached inside each rep.
-    For deadlift/hip_thrust: records the *maximum* (highest lockout) angle.
-
-    Args:
-        angles: Per-frame list of floats/None from _process_form_ai_sync
-        exercise_type: 'squat' | 'deadlift' | 'hip_thrust'
-
-    Returns:
-        List of one float per rep (capped at 50). Empty list when no reps found.
+    One angle per rep: the deepest knee angle for squats, the highest (lockout)
+    hip angle for deadlift/hip_thrust. Same reps as count_reps. Empty list when none.
     """
-    valid = [a for a in angles if a is not None and not np.isnan(a)]
-    if not valid:
-        return []
-
-    is_squat = exercise_type == "squat"
-    enter_threshold = SQUAT_DEPTH_THRESHOLD if is_squat else (DEADLIFT_LOCKOUT_THRESHOLD - 10)
-    exit_hysteresis = 15.0
-
-    per_rep: list[float] = []
-    in_rep = False
-    rep_extremum: float | None = None
-
-    for angle in valid:
-        if is_squat:
-            if not in_rep and angle <= enter_threshold:
-                in_rep = True
-                rep_extremum = angle
-            elif in_rep:
-                # Track minimum (deepest point) within rep
-                if rep_extremum is None or angle < rep_extremum:
-                    rep_extremum = angle
-                if angle > enter_threshold + exit_hysteresis:
-                    per_rep.append(rep_extremum)
-                    in_rep = False
-                    rep_extremum = None
-        else:
-            if not in_rep and angle >= enter_threshold:
-                in_rep = True
-                rep_extremum = angle
-            elif in_rep:
-                # Track maximum (full lockout peak) within rep
-                if rep_extremum is None or angle > rep_extremum:
-                    rep_extremum = angle
-                if angle < enter_threshold - exit_hysteresis:
-                    per_rep.append(rep_extremum)
-                    in_rep = False
-                    rep_extremum = None
-
-    return per_rep[:50]  # Safety cap
+    _, s, reps, _ = _segment_reps(angles, exercise_type, fps)
+    pick = np.min if exercise_type == "squat" else np.max
+    return [float(pick(s[p0:p2 + 1])) for p0, _, p2 in reps]
 
 
 # ── Symmetry & Imbalance Detection ───────────────────────────────────────────
@@ -441,10 +421,10 @@ def _compute_tempo_phases(
     Segment the angle time-series into eccentric, pause, and concentric phases
     for each detected rep, then compute average durations and a tempo label.
 
-    Phase definitions (for squats — inverted for deadlift/hip_thrust):
-      Eccentric  — angle is *decreasing* toward the load peak (going into depth/hinge)
-      Pause      — angle within ±3° of the local extremum for ≥2 consecutive frames
-      Concentric — angle is *increasing* back toward start position (coming up)
+    Uses the same reps as count_reps. Phases:
+      Eccentric  — the lowering half (squat descent, deadlift/hip thrust lowering)
+      Pause      — angle within ±3° of the turning point for ≥2 consecutive frames
+      Concentric — the lifting half
 
     Args:
         angles:        Per-frame corrected_angle list (None values filtered internally)
@@ -461,96 +441,30 @@ def _compute_tempo_phases(
             tempo_label       — e.g. '3:1:2'  ('—' if fewer than 2 reps)
     """
     fps = max(fps, 1.0)   # Guard against 0 fps
-    is_squat = exercise_type == "squat"
-
-    # Filter to valid numeric values while retaining frame indices
-    valid_pairs = [
-        (i, a) for i, a in enumerate(angles)
-        if a is not None and not np.isnan(a)
-    ]
-
-    if len(valid_pairs) < 20:   # Not enough signal for phase segmentation
-        return _empty_tempo_result()
-
-    indices, vals = zip(*valid_pairs)
-    vals = list(vals)
-
-    # ── Enter / exit thresholds (mirror logic from count_reps) ────────────────
-    enter_threshold = SQUAT_DEPTH_THRESHOLD if is_squat else (DEADLIFT_LOCKOUT_THRESHOLD - 10)
-    exit_hysteresis = 15.0
-    PAUSE_TOLERANCE = 3.0   # degrees: within ±3° of extremum = pause
+    frames, s, reps, rest = _segment_reps(angles, exercise_type, fps)
+    PAUSE_TOLERANCE = 3.0   # degrees: within ±3° of the turning point = pause
     PAUSE_MIN_FRAMES = 2    # must hold for ≥2 frames to count as pause
 
     per_rep_phases: list[dict] = []
-    in_rep = False
-    rep_start = 0
-    rep_extremum: float | None = None
-    extremum_idx = 0
+    for p0, p1, p2 in reps:
+        turn = s[p1]
+        pause_start = p1
+        while pause_start > p0 and abs(s[pause_start - 1] - turn) <= PAUSE_TOLERANCE:
+            pause_start -= 1
+        pause_end = p1
+        while pause_end < p2 and abs(s[pause_end + 1] - turn) <= PAUSE_TOLERANCE:
+            pause_end += 1
 
-    i = 0
-    while i < len(vals):
-        angle = vals[i]
-
-        if is_squat:
-            enter = angle <= enter_threshold
-            exit_cond = in_rep and angle > enter_threshold + exit_hysteresis
-        else:
-            enter = angle >= enter_threshold
-            exit_cond = in_rep and angle < enter_threshold - exit_hysteresis
-
-        if not in_rep and enter:
-            in_rep = True
-            rep_start = i
-            rep_extremum = angle
-            extremum_idx = i
-
-        elif in_rep:
-            # Track extremum
-            if is_squat:
-                if rep_extremum is None or angle < rep_extremum:
-                    rep_extremum = angle
-                    extremum_idx = i
-            else:
-                if rep_extremum is None or angle > rep_extremum:
-                    rep_extremum = angle
-                    extremum_idx = i
-
-            if exit_cond:
-                rep_end = i
-                in_rep = False
-
-                # ── Phase segmentation within this rep ────────────────────────
-                rep_vals = vals[rep_start:rep_end + 1]
-                ext_local = extremum_idx - rep_start  # local index of extremum
-
-                # Find pause window: frames within PAUSE_TOLERANCE of extremum
-                pause_start = ext_local
-                pause_end   = ext_local
-                for k in range(max(0, ext_local - 1), -1, -1):
-                    if abs(rep_vals[k] - rep_extremum) <= PAUSE_TOLERANCE:
-                        pause_start = k
-                    else:
-                        break
-                for k in range(ext_local + 1, len(rep_vals)):
-                    if abs(rep_vals[k] - rep_extremum) <= PAUSE_TOLERANCE:
-                        pause_end = k
-                    else:
-                        break
-
-                # Only count as a pause if it spans ≥ PAUSE_MIN_FRAMES
-                pause_frames = (pause_end - pause_start + 1) if (pause_end - pause_start) >= PAUSE_MIN_FRAMES - 1 else 0
-                ecc_frames   = max(0, pause_start)                          # frames before pause
-                con_frames   = max(0, len(rep_vals) - 1 - pause_end)        # frames after pause
-
-                per_rep_phases.append({
-                    "ecc_frames":   ecc_frames,
-                    "pause_frames": pause_frames,
-                    "con_frames":   con_frames,
-                })
-
-                rep_extremum = None
-
-        i += 1
+        away = int(frames[pause_start] - frames[p0])          # leaving the rest position
+        back = int(frames[p2] - frames[pause_end])            # returning to it
+        held = int(frames[pause_end] - frames[pause_start]) + 1
+        # From a standing start, moving away is the lowering (eccentric) half; from the bottom it's the lift
+        ecc, con = (away, back) if rest == "hi" else (back, away)
+        per_rep_phases.append({
+            "ecc_frames":   ecc,
+            "pause_frames": held if held >= PAUSE_MIN_FRAMES else 0,
+            "con_frames":   con,
+        })
 
     if len(per_rep_phases) < 2:
         return _empty_tempo_result()
@@ -656,7 +570,7 @@ def compute_session_stats(
             per_rep_phases, avg_ecc_sec, avg_pause_sec, avg_con_sec,
             avg_ecc_con_ratio, tempo_label, symmetry
     """
-    per_rep = _extract_per_rep_angles(angles_per_frame, exercise_type)
+    per_rep = _extract_per_rep_angles(angles_per_frame, exercise_type, fps)
 
     # Need at least 1 rep for any meaningful stats; grade requires meaningful pct
     has_data = len(per_rep) >= 1

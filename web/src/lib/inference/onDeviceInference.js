@@ -361,7 +361,7 @@ export async function processVideoOnDevice(file, {
 
   // ── 4. Init pipeline ────────────────────────────────────────────────────────
   const smoother   = new KalmanSmoother();
-  const repCounter = new RepCounter(exerciseType);
+  const repCounter = new RepCounter(exerciseType, OUT_FPS);
   const allAngles      = [];
   const allConfidences = [];
 
