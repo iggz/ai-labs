@@ -23,6 +23,8 @@ import socket
 import logging
 import tempfile
 import hashlib
+import hmac
+import re
 import time as _time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -138,10 +140,25 @@ app = FastAPI(
 # Mount local static processed file directory
 os.makedirs("static/processed", exist_ok=True)
 
+# A bare file name: no separators (/ or \), no drive letters, no leading dot.
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$")
+
+
+def _path_inside(base_dir: str, name: str) -> str | None:
+    """Join a client-supplied file name onto base_dir, or None if it could escape it."""
+    if not _SAFE_NAME_RE.fullmatch(name) or ".." in name:
+        return None
+    base = os.path.realpath(base_dir)
+    path = os.path.realpath(os.path.join(base, name))
+    if os.path.dirname(path) != base:
+        return None
+    return path
+
+
 @app.get("/static/processed/{video_name}")
 async def serve_video(video_name: str, range: str = Header(None)):
-    video_path = os.path.join("static", "processed", video_name)
-    if not os.path.exists(video_path):
+    video_path = _path_inside(os.path.join("static", "processed"), video_name)
+    if not video_path or not os.path.isfile(video_path):
         raise HTTPException(status_code=404, detail="Video not found")
         
     file_size = os.path.getsize(video_path)
@@ -560,7 +577,10 @@ def _run_crawl_in_background(url: str, filename: str, api_key: str):
         ingest_dir = os.path.join(base_dir, "rag-engine", "ingest")
         os.makedirs(ingest_dir, exist_ok=True)
         
-        target_path = os.path.join(ingest_dir, filename)
+        target_path = _path_inside(ingest_dir, filename)
+        if not target_path:
+            logger.error(f"[FIRECRAWL] Refusing unsafe filename: {filename!r}")
+            return
         with open(target_path, "w", encoding="utf-8") as f:
             f.write(markdown_content)
             
@@ -596,12 +616,19 @@ async def crawl_exercise(req: CrawlRequest, background_tasks: BackgroundTasks):
         else:
             derived_name = f"{domain_part}.md"
         # Sanitize filename
-        filename = "".join(c for c in derived_name if c.isalnum() or c in "._-").strip()
+        filename = re.sub(r"[^A-Za-z0-9._-]", "", derived_name).replace("..", ".").lstrip("._-")
     else:
         filename = req.filename.strip()
         if not filename.endswith(".md"):
             filename += ".md"
-            
+
+    # The name is joined onto the rag-engine ingest dir, so it must be a bare file name.
+    if not _SAFE_NAME_RE.fullmatch(filename) or ".." in filename:
+        raise HTTPException(
+            status_code=400,
+            detail="filename must be a plain file name (letters, digits, '.', '_', '-'), no paths.",
+        )
+
     background_tasks.add_task(_run_crawl_in_background, url, filename, api_key)
     
     return {
@@ -739,11 +766,40 @@ async def get_job_status(job_id: str):
     return JSONResponse(content=response, headers=headers)
 
 
+def _authorized_analysis(analysis_id: str, consent_token: str | None, columns: str) -> dict:
+    """
+    Fetch an analysis row only if the caller holds its consent_token.
+
+    The token is the random UUID the browser generated for that upload, so only
+    the uploader has it. Analysis IDs are public (the benchmarks API lists them)
+    and can't be used as proof of ownership on their own.
+    """
+    row = (
+        supabase.table("cv_analyses")
+        .select(f"consent_token,{columns}")
+        .eq("id", analysis_id)
+        .execute()
+    )
+    stored = (row.data[0].get("consent_token") or "") if row.data else ""
+    # Same 404 for "no such row" and "wrong token" so IDs can't be probed.
+    if not consent_token or not stored or not hmac.compare_digest(
+        stored.encode(), consent_token.encode()
+    ):
+        raise HTTPException(404, "Analysis not found")
+    return row.data[0]
+
+
 @app.patch("/api/v1/analyses/{analysis_id}/retention")
-async def update_retention(analysis_id: str, retain_forever: bool):
+async def update_retention(
+    analysis_id: str,
+    retain_forever: bool,
+    x_consent_token: str | None = Header(None),
+):
     """Toggle video retention preference (user-controlled per-analysis)."""
     if not supabase:
         raise HTTPException(503, "Database not configured")
+
+    _authorized_analysis(analysis_id, x_consent_token, "id")
 
     update_data: dict
     if retain_forever:
@@ -757,16 +813,14 @@ async def update_retention(analysis_id: str, retain_forever: bool):
 
 
 @app.delete("/api/v1/analyses/{analysis_id}")
-async def delete_analysis(analysis_id: str):
+async def delete_analysis(analysis_id: str, x_consent_token: str | None = Header(None)):
     """Immediately delete an analysis record and its storage object."""
     if not supabase:
         raise HTTPException(503, "Database not configured")
 
-    row = supabase.table("cv_analyses").select("processed_url").eq("id", analysis_id).execute()
-    if not row.data:
-        raise HTTPException(404, "Analysis not found")
+    row = _authorized_analysis(analysis_id, x_consent_token, "processed_url")
 
-    processed_url = row.data[0].get("processed_url", "")
+    processed_url = row.get("processed_url", "")
     if processed_url:
         # Extract object name from URL and delete from storage
         try:

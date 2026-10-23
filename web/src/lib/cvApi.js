@@ -191,11 +191,12 @@ export async function submitAnalysis(file, analysisType, extraFields = {}, onPro
 
 /**
  * Toggle the retention preference for a specific analysis.
+ * consentToken is the UUID sent with the original upload; the server requires it.
  */
-export async function setRetention(analysisId, retainForever) {
+export async function setRetention(analysisId, retainForever, consentToken) {
   const res = await fetch(
     `${getApiBase()}/api/v1/analyses/${analysisId}/retention?retain_forever=${retainForever}`,
-    { method: 'PATCH' }
+    { method: 'PATCH', headers: { 'X-Consent-Token': consentToken } }
   );
   if (!res.ok) throw new Error('Failed to update retention');
   return res.json();
@@ -203,10 +204,12 @@ export async function setRetention(analysisId, retainForever) {
 
 /**
  * Immediately delete an analysis and its associated video.
+ * consentToken is the UUID sent with the original upload; the server requires it.
  */
-export async function deleteAnalysis(analysisId) {
+export async function deleteAnalysis(analysisId, consentToken) {
   const res = await fetch(`${getApiBase()}/api/v1/analyses/${analysisId}`, {
     method: 'DELETE',
+    headers: { 'X-Consent-Token': consentToken },
   });
   if (!res.ok) throw new Error('Failed to delete analysis');
   return res.json();
